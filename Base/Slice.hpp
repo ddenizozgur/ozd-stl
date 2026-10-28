@@ -48,7 +48,7 @@ constexpr Slice<T> SliceFromArray(T (&array)[N])
 // [first, onePastLast)
 template <typename T>
 [[nodiscard]]
-constexpr Slice<T> SliceRange(Slice<T> slice, usize first, usize onePastLast)
+constexpr Slice<T> SliceFromRange(Slice<T> slice, usize first, usize onePastLast)
 {
   assert(first <= onePastLast && "slice range is reversed");
   assert(onePastLast <= slice.count && "slice range out of bounds");

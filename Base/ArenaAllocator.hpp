@@ -3,6 +3,7 @@
 #include "BumpAllocator.hpp"
 #include "Virtual.hpp"
 
+inline constexpr usize SCRATCH_DEFAULT_RESERVE_SIZE = Gigabytes(16);
 inline constexpr usize ARENA_DEFAULT_RESERVE_SIZE = Gigabytes(1);
 inline constexpr usize ARENA_DEFAULT_PER_COMMIT_SIZE = Kilobytes(16);
 
@@ -65,7 +66,7 @@ inline void *ArenaPushEx(Arena_Allocator *arena, usize size, usize alignment)
     return nullptr;
   }
 
-  auto position = arena->bump.position;
+  auto position = ArenaPosition(arena);
   if (arena->isVirtual && position > arena->committed)
   {
     auto backingBuffer = arena->bump.backingBuffer;
@@ -73,7 +74,7 @@ inline void *ArenaPushEx(Arena_Allocator *arena, usize size, usize alignment)
     auto commitEnd = AlignForward(baseAddress + position, arena->perCommitSize) - baseAddress;
     commitEnd = Minimum(commitEnd, backingBuffer.count);
 
-    Slice<u8> range = SliceRange(backingBuffer, arena->committed, commitEnd);
+    Slice<u8> range = SliceFromRange(backingBuffer, arena->committed, commitEnd);
     if (!Win32_VirtualCommit(range))
     {
       BumpPopTo(&arena->bump, rollback);
@@ -87,7 +88,7 @@ inline void *ArenaPushEx(Arena_Allocator *arena, usize size, usize alignment)
 }
 
 constexpr void ArenaPopTo(Arena_Allocator *arena, usize to)
-{ // TODO: decommit version
+{
   BumpPopTo(&arena->bump, to);
 }
 
@@ -102,6 +103,7 @@ inline void ArenaFree(Arena_Allocator *arena)
   {
     Win32_VirtualRelease(arena->bump.backingBuffer);
   }
+  // TODO: should we invalidate the arena even if not virtual ?
   *arena = {};
 }
 
@@ -116,12 +118,12 @@ template <typename T>
 [[nodiscard]]
 inline Slice<T> ArenaPushSlice(Arena_Allocator *arena, usize count)
 {
-  T *data = ArenaPush<T>(arena, count);
-  if (data == nullptr)
+  T *ptr = ArenaPush<T>(arena, count);
+  if (ptr == nullptr)
   {
     return {};
   }
-  return {data, count};
+  return {ptr, count};
 }
 
 template <typename T>
@@ -172,11 +174,14 @@ inline bool IsScratch(const Arena_Allocator *arena)
 }
 
 [[nodiscard]]
-inline Arena_Allocator *ScratchGet()
+inline Arena_Allocator *ScratchGetArena()
 {
   if (doNotUseThisScratch.bump.backingBuffer.ptr == nullptr)
   {
-    if (auto [scratch, ok] = ArenaInit(); ok)
+    auto [scratch, scratchOk] = ArenaInit(
+        SCRATCH_DEFAULT_RESERVE_SIZE,
+        ARENA_DEFAULT_PER_COMMIT_SIZE);
+    if (scratchOk)
     {
       doNotUseThisScratch = scratch;
     }
@@ -187,18 +192,12 @@ inline Arena_Allocator *ScratchGet()
 [[nodiscard]]
 inline Scratch ScratchBegin()
 {
-  auto arena = ScratchGet();
-  return {arena, arena->bump.position};
+  auto arena = ScratchGetArena();
+  return {arena, ArenaPosition(arena)};
 }
 
 inline bool ScratchEnd(Scratch scratch, bool ignore = false)
 {
-  if (!IsScratch(scratch.arena))
-  {
-    assert(false && "non-scratch argument passed");
-    return false;
-  }
-
   if (!ignore)
   {
     ArenaPopTo(scratch.arena, scratch.position);

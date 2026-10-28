@@ -41,3 +41,21 @@ template <typename T>
 [[nodiscard]] constexpr Vector2<T> operator*(Vector2<T> left, Non_Deduced<T> right) { return {left.data[0] * right, left.data[1] * right}; }
 template <typename T>
 [[nodiscard]] constexpr Vector2<T> operator/(Vector2<T> left, Non_Deduced<T> right) { return {left.data[0] / right, left.data[1] / right}; }
+
+template <typename T>
+constexpr Vector2<T> &operator+=(Vector2<T> &left, Vector2<T> right) { return left = left + right; }
+template <typename T>
+constexpr Vector2<T> &operator-=(Vector2<T> &left, Vector2<T> right) { return left = left - right; }
+template <typename T>
+constexpr Vector2<T> &operator*=(Vector2<T> &left, Vector2<T> right) { return left = left * right; }
+template <typename T>
+constexpr Vector2<T> &operator/=(Vector2<T> &left, Vector2<T> right) { return left = left / right; }
+
+template <typename T>
+constexpr Vector2<T> &operator+=(Vector2<T> &left, Non_Deduced<T> right) { return left = left + right; }
+template <typename T>
+constexpr Vector2<T> &operator-=(Vector2<T> &left, Non_Deduced<T> right) { return left = left - right; }
+template <typename T>
+constexpr Vector2<T> &operator*=(Vector2<T> &left, Non_Deduced<T> right) { return left = left * right; }
+template <typename T>
+constexpr Vector2<T> &operator/=(Vector2<T> &left, Non_Deduced<T> right) { return left = left / right; }

@@ -11,7 +11,7 @@ using String16 = Slice<wchar_t>;
 // StringFmt(arena, "name: %.*s", StringArgs(name))
 #define StringArgs(s) static_cast<i32>((s).count), (s).ptr
 
-// the result is followed by a 0 terminator in memory, not counted in count
+// the result is followed by a null terminator, not counted in count
 [[nodiscard]]
 PrintfLike(2, 0) inline String StringFmtV(Arena_Allocator *arena, const char *fmt, va_list args)
 {
@@ -34,7 +34,7 @@ PrintfLike(2, 0) inline String StringFmtV(Arena_Allocator *arena, const char *fm
   return {res.ptr, static_cast<usize>(length)};
 }
 
-// the result is followed by a 0 terminator in memory, not counted in count
+// the result is followed by a null terminator, not counted in count
 [[nodiscard]]
 PrintfLike(2, 3) inline String StringFmt(Arena_Allocator *arena, const char *fmt, ...)
 {
@@ -51,6 +51,9 @@ constexpr String StringLit(const char (&literal)[N])
 {
   return {const_cast<char *>(literal), N - 1};
 }
+
+#define DoNotUseThisStringify(S) #S
+#define Stringify(S) StringLit(DoNotUseThisStringify(S))
 
 template <usize N>
 [[nodiscard]]
@@ -96,11 +99,11 @@ inline char *CStringFrom(Arena_Allocator *arena, String source)
   {
     memmove(res.ptr, source.ptr, source.count);
   }
-  res.ptr[source.count] = 0;
+  res[source.count] = 0;
   return res.ptr;
 }
 
-// the result is followed by a 0 terminator in memory, not counted in count
+// the result is followed by a null terminator, not counted in count
 [[nodiscard]]
 inline String Win32_StringFrom16(Arena_Allocator *arena, String16 source)
 {
@@ -126,7 +129,7 @@ inline String Win32_StringFrom16(Arena_Allocator *arena, String16 source)
   return {res.ptr, static_cast<usize>(count)};
 }
 
-// the result is followed by a 0 terminator in memory, not counted in count
+// the result is followed by a null terminator, not counted in count
 [[nodiscard]]
 inline String16 Win32_String16From(Arena_Allocator *arena, String source)
 {

@@ -21,7 +21,6 @@ union R_B8G8R8A8
   constexpr R_B8G8R8A8(u8 b, u8 g, u8 r, u8 a) : data{b, g, r, a} {}
 };
 
-// the 16-color CGA/EGA text mode palette, written as {b, g, r, a}
 inline constexpr R_B8G8R8A8 R_CGA_BLACK = {0x00, 0x00, 0x00, 0xFF};
 inline constexpr R_B8G8R8A8 R_CGA_BLUE = {0xAA, 0x00, 0x00, 0xFF};
 inline constexpr R_B8G8R8A8 R_CGA_GREEN = {0x00, 0xAA, 0x00, 0xFF};
@@ -159,7 +158,7 @@ inline R_B8G8R8A8 R_Peek(const R_FrameBuffer *frameBuffer, Vector2<i32> position
   return color;
 }
 
-inline void R_Fill(R_FrameBuffer *frameBuffer, R_B8G8R8A8 color)
+inline void R_Clear(R_FrameBuffer *frameBuffer, R_B8G8R8A8 color)
 {
   for (auto &it : frameBuffer->data)
   {
@@ -292,13 +291,19 @@ inline void R_HexDump(R_FrameBuffer *frameBuffer, R_BitmapFont font, Vector2<i32
                       const void *address, i32 bytesPerRow, i32 rowCount)
 {
   auto bytes = static_cast<const u8 *>(address);
-  for (i32 row = 0; row < rowCount; row += 1, bytes += bytesPerRow)
+  for (auto row = 0; row < rowCount; row += 1, bytes += bytesPerRow)
   {
     auto cursor = position + Vector2<i32>{0, row * font.glyphSize.height};
-    R_PrintFmtAscii(frameBuffer, font, cursor, R_CGA_WHITE, "%016llx:", (u64)bytes);
-    cursor.x += 18 * font.glyphSize.width;
+    {
+      auto scratch = ScratchBegin();
+      Defer(ScratchEnd(scratch););
 
-    for (i32 i = 0; i < bytesPerRow; i += 1)
+      auto addressString = StringFmt(scratch.arena, "%zx:", reinterpret_cast<usize>(bytes));
+      R_PutStringAscii(frameBuffer, font, cursor, R_CGA_WHITE, addressString);
+      cursor.x += (addressString.count + 1) * font.glyphSize.width;
+    }
+
+    for (auto i = 0; i < bytesPerRow; i += 1)
     {
       u8 value = bytes[i];
       R_PrintFmtAscii(frameBuffer, font, cursor, value == 0 ? R_CGA_LIGHT_GRAY : R_CGA_WHITE, "%02x", value);

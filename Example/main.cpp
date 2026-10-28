@@ -26,6 +26,57 @@ void UpdateTitle(HWND hWnd, f32 frameTime)
   frameCounter += 1;
 }
 
+[[nodiscard]] constexpr f32 LerpF32(f32 start, f32 end, f32 t)
+{
+  return (1 - t) * start + t * end;
+}
+
+[[nodiscard]] constexpr Vector2<f32> Lerp2F32(Vector2<f32> start, Vector2<f32> end, f32 t)
+{
+  return {LerpF32(start.x, end.x, t), LerpF32(start.y, end.y, t)};
+}
+
+// coverage 0 keeps the pixel, 1 replaces it with color
+void BlendPixelUnsafe(R_FrameBuffer *frameBuffer, Vector2<i32> position, R_B8G8R8A8 color, f32 coverage)
+{
+  auto &pixel = frameBuffer->data.ptr[static_cast<usize>(position.y) * frameBuffer->size.width + position.x];
+  for (auto i = 0; i < 4; i += 1)
+  {
+    f32 blended = pixel.data[i] + (color.data[i] - pixel.data[i]) * coverage;
+    pixel.data[i] = static_cast<u8>(blended + 0.5f);
+  }
+}
+
+// pixel (x, y) covers the area from (x, y) to (x + 1, y + 1).
+// edge pixels the rect only partly covers get the color mixed in by the covered fraction.
+void FillRectAntialiased(R_FrameBuffer *frameBuffer, Vector2<f32> position, Vector2<f32> size, R_B8G8R8A8 color)
+{
+  auto bottomRight = position + size;
+
+  auto left = Maximum(0, static_cast<i32>(floorf(position.x)));
+  auto top = Maximum(0, static_cast<i32>(floorf(position.y)));
+  auto right = Minimum(static_cast<i32>(ceilf(bottomRight.x)), frameBuffer->size.width);
+  auto bottom = Minimum(static_cast<i32>(ceilf(bottomRight.y)), frameBuffer->size.height);
+
+  for (auto y = top; y < bottom; y += 1)
+  {
+    f32 coverageY = Minimum(y + 1.0f, bottomRight.y) - Maximum(static_cast<f32>(y), position.y);
+    for (auto x = left; x < right; x += 1)
+    {
+      f32 coverageX = Minimum(x + 1.0f, bottomRight.x) - Maximum(static_cast<f32>(x), position.x);
+      f32 coverage = coverageX * coverageY;
+      if (coverage >= 1.0f)
+      {
+        R_PlotUnsafe(frameBuffer, {x, y}, color);
+      }
+      else
+      {
+        BlendPixelUnsafe(frameBuffer, {x, y}, color, coverage);
+      }
+    }
+  }
+}
+
 inline auto WIN32_NON_UNICODE_CURSOR_ARROW = MAKEINTRESOURCEA(32512);
 
 int main()
@@ -44,7 +95,9 @@ int main()
 
   DWORD dwStyle = WS_OVERLAPPEDWINDOW;
   DWORD dwExStyle = 0; // DX11 flip model: WS_EX_NOREDIRECTIONBITMAP
-  RECT wndRect = {0, 0, 640 * 2, 480 * 2};
+
+  Vector2<i32> frameBufferSize = {720, 480};
+  RECT wndRect = {0, 0, frameBufferSize.x * 2, frameBufferSize.y * 2};
   AdjustWindowRectExForDpi(&wndRect, dwStyle, false, dwExStyle, g.dpi);
 
   auto hWnd = CreateWindowExW(dwExStyle, wndClass.lpszClassName, L"SomeApp", dwStyle,
@@ -52,13 +105,15 @@ int main()
                               wndRect.right - wndRect.left, wndRect.bottom - wndRect.top,
                               nullptr, nullptr, hInstance, nullptr);
   Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic);
-  ShowWindow(hWnd, SW_SHOW);
+  ShowWindow(hWnd, SW_SHOWMAXIMIZED);
 
   auto [arena, arenaOk] = ArenaInit();
-  auto frameBuffer = R_CreateFrameBuffer(&arena, {640, 480});
+  auto frameBuffer = R_CreateFrameBuffer(&arena, frameBufferSize);
 
   auto timeNow = Win32_NowNanoseconds();
   auto timeLast = timeNow;
+
+  Vector2<f32> position{};
 
   for (; !g.shouldClose;)
   {
@@ -77,28 +132,16 @@ int main()
       auto hDC = GetDC(hWnd);
       Defer(ReleaseDC(hWnd, hDC););
 
-      R_Fill(&frameBuffer, {0x44, 0x33, 0x22, 0xff});
+      R_Clear(&frameBuffer, {0x44, 0x33, 0x22, 0xff});
+      Defer(R_PresentFrameBuffer(hWnd, hDC, frameBuffer););
 
-      Vector2<i32> cursor = {};
-#define X(Font, Rows)                                            \
-  R_HexDump(&frameBuffer, Font, cursor, (void *)main, 16, Rows); \
-  cursor.y += (Rows + 1) * Font.glyphSize.height;
-      X(R_FONT_3DFX, 4)
-      X(R_FONT_DEBUG, 4)
-      X(R_FONT_MINECRAFT, 4)
-#undef X
+      position += {20 * frameTime, 16 * frameTime};
+      // R_FillRect(&frameBuffer, R_PixelFrom(position), {32 * 2, 24 * 2}, R_CGA_LIGHT_RED);
+      // FillRectAntialiased(&frameBuffer, position + Vector2<f32>{0, 40 * 2}, {32 * 2, 24 * 2}, R_CGA_LIGHT_RED);
 
-      for (auto j = cursor.y + 8; j < frameBuffer.size.height; j += 1)
-      {
-        for (auto i = 0; i < frameBuffer.size.width; i += 1)
-        {
-          R_PlotUnsafe(&frameBuffer, {i, j}, {u8(i), u8(j), u8(i + j), 0xff});
-        }
-      }
-
-      R_PresentFrameBuffer(hWnd, hDC, frameBuffer);
+      R_HexDump(&frameBuffer, R_FONT_COURIER, {}, (void *)main, 16, 48);
     }
 
-    // DwmFlush();
+    DwmFlush();
   }
 }

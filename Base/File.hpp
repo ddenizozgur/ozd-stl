@@ -27,10 +27,10 @@ enum : File_Share_Flags
 };
 
 [[nodiscard]]
-inline Pair<Win32_File, bool> Win32_FileOpen(
-    String path,
-    File_Mode_Flags mode = File_Mode_Flag_Read,
-    File_Share_Flags share = File_Share_Flag_Read | File_Share_Flag_Write)
+inline Pair<Win32_File, bool>
+Win32_FileOpen(String path,
+               File_Mode_Flags mode = File_Mode_Flag_Read,
+               File_Share_Flags share = File_Share_Flag_Read | File_Share_Flag_Write)
 {
   DWORD access = 0;
   DWORD disposition = OPEN_EXISTING;
@@ -90,9 +90,10 @@ inline usize Win32_FileSize(Win32_File file)
 }
 
 [[nodiscard]]
-inline Pair<Slice<u8>, bool> Win32_FileRead(
-    Arena_Allocator *arena, Win32_File file, usize offset, usize size,
-    usize alignment = WIN32_FILE_READ_DEFAULT_ALIGNMENT)
+inline Pair<Slice<u8>, bool>
+Win32_FileRead(Arena_Allocator *arena,
+               Win32_File file, usize offset, usize size,
+               usize alignment = WIN32_FILE_READ_DEFAULT_ALIGNMENT)
 {
   assert(file.handle != nullptr && "file isn't open");
 
@@ -156,9 +157,9 @@ inline bool Win32_FileSetSize(Win32_File file, usize size)
 }
 
 [[nodiscard]]
-inline Pair<Slice<u8>, bool> Win32_ReadEntireFile(
-    Arena_Allocator *arena, String path,
-    usize alignment = WIN32_FILE_READ_DEFAULT_ALIGNMENT)
+inline Pair<Slice<u8>, bool>
+Win32_ReadEntireFile(Arena_Allocator *arena, String path,
+                     usize alignment = WIN32_FILE_READ_DEFAULT_ALIGNMENT)
 {
   auto [opened, ok] = Win32_FileOpen(path);
   if (!ok)
