@@ -1,8 +1,17 @@
-#include "Win32Stuff.hpp"
-#include "R.hpp"
-#include "../Base/TaskDialog.hpp"
-#include "../Base/Theme.hpp"
+#include "../Win32Stuff/TaskDialog.hpp"
+#include "../Win32Stuff/Theme.hpp"
+#include "../Win32Stuff/WindowRelated.hpp"
 #include "../Base/Time.hpp"
+#include "R.hpp"
+
+struct Example_Globals
+{
+  bool shouldClose = false;
+  u32 dpi = USER_DEFAULT_SCREEN_DPI;
+};
+inline Example_Globals g;
+
+inline LRESULT CALLBACK ExampleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 void UpdateTitle(HWND hWnd, f32 frameTime)
 {
@@ -131,4 +140,47 @@ int main()
 
     // DwmFlush();
   }
+}
+
+inline LRESULT CALLBACK ExampleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+  LRESULT result = 0;
+  switch (message)
+  {
+  case WM_CREATE:
+    g.dpi = GetDpiForWindow(hWnd);
+    break;
+  case WM_SIZE:
+    break;
+  case WM_ERASEBKGND:
+    result = 1;
+    break;
+  case WM_PAINT:
+  {
+    PAINTSTRUCT paint;
+    BeginPaint(hWnd, &paint);
+    EndPaint(hWnd, &paint);
+    break;
+  }
+  case WM_DPICHANGED:
+  {
+    // the window moved to a monitor with a different scale, or the user changed the scale.
+    // lParam is the size and position Windows suggests at the new dpi.
+    auto suggested = reinterpret_cast<RECT *>(lParam);
+    SetWindowPos(hWnd, nullptr,
+                 suggested->left, suggested->top,
+                 suggested->right - suggested->left,
+                 suggested->bottom - suggested->top,
+                 SWP_NOZORDER | SWP_NOACTIVATE);
+    g.dpi = HIWORD(wParam);
+    break;
+  }
+  case WM_DESTROY:
+    g.shouldClose = true;
+    break;
+  default:
+    result = DefWindowProcW(hWnd, message, wParam, lParam);
+    break;
+  }
+  return result;
 }

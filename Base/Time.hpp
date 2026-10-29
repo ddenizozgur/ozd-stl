@@ -20,8 +20,7 @@ inline u64 Win32_NowNanoseconds()
 {
   LARGE_INTEGER counter;
   QueryPerformanceCounter(&counter);
-  return MulDivU64(counter.QuadPart,
-                   Billion(1), Win32_PerformanceFrequency());
+  return MulDivU64(counter.QuadPart, Billion(1), Win32_PerformanceFrequency());
 }
 
 [[nodiscard]]
