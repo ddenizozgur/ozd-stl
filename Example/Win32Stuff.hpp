@@ -16,7 +16,7 @@ inline String Win32_GetWindowText(Arena_Allocator *arena, HWND hWnd)
   {
     return {};
   }
-  usize copied = GetWindowTextW(hWnd, text.ptr, static_cast<i32>(text.count));
+  usize copied = GetWindowTextW(hWnd, text.ptr, text.count);
   return Win32_StringFrom16(arena, {text.ptr, copied});
 }
 

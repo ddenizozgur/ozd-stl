@@ -3,7 +3,7 @@
 #include "BumpAllocator.hpp"
 #include "Virtual.hpp"
 
-inline constexpr usize SCRATCH_DEFAULT_RESERVE_SIZE = Gigabytes(16);
+inline constexpr usize SCRATCH_DEFAULT_RESERVE_SIZE = Gigabytes(8);
 inline constexpr usize ARENA_DEFAULT_RESERVE_SIZE = Gigabytes(1);
 inline constexpr usize ARENA_DEFAULT_PER_COMMIT_SIZE = Kilobytes(16);
 
@@ -16,28 +16,22 @@ struct Arena_Allocator
 };
 
 [[nodiscard]]
-inline Pair<Arena_Allocator, bool> ArenaInit(
-    usize reserveSize = ARENA_DEFAULT_RESERVE_SIZE,
-    usize perCommitSize = ARENA_DEFAULT_PER_COMMIT_SIZE)
+inline Arena_Allocator ArenaInit(usize reserveSize = ARENA_DEFAULT_RESERVE_SIZE,
+                                 usize perCommitSize = ARENA_DEFAULT_PER_COMMIT_SIZE)
 {
-  // reserving less than 64KiB on windows is waste
+  // costs nothing, memory is committed separately as the arena grows
   reserveSize = AlignForwardPow2(reserveSize, Win32_AllocationGranularity());
 
   perCommitSize = Minimum(perCommitSize, reserveSize);
-  // align perCommitSize with pagesize.
   perCommitSize = AlignForwardPow2(perCommitSize, Win32_PageSize());
   // reserved memory is already aligned for us
   Slice<u8> reserved = Win32_VirtualReserve(reserveSize);
-  if (reserved.ptr == nullptr)
-  {
-    return {};
-  }
 
   Arena_Allocator res = {};
   res.bump = BumpInit(reserved);
   res.perCommitSize = perCommitSize;
   res.isVirtual = true;
-  return {res, true};
+  return res;
 }
 
 [[nodiscard]]
@@ -59,7 +53,6 @@ constexpr usize ArenaPosition(const Arena_Allocator *arena)
 inline void *ArenaPushEx(Arena_Allocator *arena, usize size, usize alignment)
 {
   // Windows always zeroes fresh commits.
-  auto rollback = ArenaPosition(arena);
   void *res = BumpPushEx(&arena->bump, size, alignment);
   if (res == nullptr)
   {
@@ -74,13 +67,8 @@ inline void *ArenaPushEx(Arena_Allocator *arena, usize size, usize alignment)
     auto commitEnd = AlignForward(baseAddress + position, arena->perCommitSize) - baseAddress;
     commitEnd = Minimum(commitEnd, backingBuffer.count);
 
-    Slice<u8> range = SliceFromRange(backingBuffer, arena->committed, commitEnd);
-    if (!Win32_VirtualCommit(range))
-    {
-      BumpPopTo(&arena->bump, rollback);
-      return nullptr;
-    }
-
+    auto range = SliceFromRange(backingBuffer, arena->committed, commitEnd);
+    Win32_VirtualCommit(range);
     arena->committed = commitEnd;
   }
 
@@ -103,7 +91,6 @@ inline void ArenaFree(Arena_Allocator *arena)
   {
     Win32_VirtualRelease(arena->bump.backingBuffer);
   }
-  // TODO: should we invalidate the arena even if not virtual ?
   *arena = {};
 }
 
@@ -152,10 +139,6 @@ inline Slice<T> ArenaCloneSlice(Arena_Allocator *arena, Slice<T> source)
   return res;
 }
 
-// template <typename T> inline void ArenaPop(Arena_Allocator *arena, usize count = 1) {
-//   ArenaPopBy(arena, sizeof(T) * count);
-// }
-
 //
 // Scratch
 //
@@ -178,13 +161,9 @@ inline Arena_Allocator *ScratchGetArena()
 {
   if (doNotUseThisScratch.bump.backingBuffer.ptr == nullptr)
   {
-    auto [scratch, scratchOk] = ArenaInit(
+    doNotUseThisScratch = ArenaInit(
         SCRATCH_DEFAULT_RESERVE_SIZE,
         ARENA_DEFAULT_PER_COMMIT_SIZE);
-    if (scratchOk)
-    {
-      doNotUseThisScratch = scratch;
-    }
   }
   return &doNotUseThisScratch;
 }
@@ -196,13 +175,12 @@ inline Scratch ScratchBegin()
   return {arena, ArenaPosition(arena)};
 }
 
-inline bool ScratchEnd(Scratch scratch, bool ignore = false)
+inline void ScratchEnd(Scratch scratch, bool ignore = false)
 {
   if (!ignore)
   {
     ArenaPopTo(scratch.arena, scratch.position);
   }
-  return true;
 }
 
 inline void ScratchFree()

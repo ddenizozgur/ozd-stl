@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Base/Slice.hpp"
+#include "../Base/Math.hpp"
 
 struct R_BitmapFont
 {

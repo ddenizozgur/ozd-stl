@@ -6,7 +6,7 @@ rem Build.bat release      - optimized build (-O3, asserts off)
 
 cd /d "%~dp0"
 
-set mode=-g -O0
+set mode=-g -O1
 set run=0
 for %%a in (%*) do (
   if "%%a"=="release" set mode=-O3 -DNDEBUG

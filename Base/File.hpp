@@ -86,7 +86,31 @@ inline usize Win32_FileSize(Win32_File file)
   assert(file.handle != nullptr && "file isn't open");
   LARGE_INTEGER size = {};
   GetFileSizeEx(file.handle, &size);
-  return static_cast<usize>(size.QuadPart);
+  return size.QuadPart;
+}
+
+// returns how many bytes were read
+inline usize Win32_FileReadToBuffer(Win32_File file, usize offset, Slice<u8> buffer)
+{
+  assert(file.handle != nullptr && "file isn't open");
+
+  usize total = 0;
+  for (; total < buffer.count;)
+  {
+    usize position = offset + total;
+    OVERLAPPED overlapped = {};
+    overlapped.Offset = static_cast<DWORD>(position);
+    overlapped.OffsetHigh = static_cast<DWORD>(position >> 32);
+
+    DWORD chunk = Minimum(buffer.count - total, WIN32_FILE_IO_CHUNK_SIZE);
+    DWORD read = 0;
+    if (!ReadFile(file.handle, buffer.ptr + total, chunk, &read, &overlapped) || read == 0)
+    {
+      break;
+    }
+    total += read;
+  }
+  return total;
 }
 
 [[nodiscard]]
@@ -95,33 +119,15 @@ Win32_FileRead(Arena_Allocator *arena,
                Win32_File file, usize offset, usize size,
                usize alignment = WIN32_FILE_READ_DEFAULT_ALIGNMENT)
 {
-  assert(file.handle != nullptr && "file isn't open");
-
-  auto ptr = static_cast<u8 *>(ArenaPushEx(arena, size, alignment));
-  if (ptr == nullptr)
+  auto buffer = ArenaPushSliceEx<u8>(arena, size, alignment);
+  if (buffer.ptr == nullptr)
   {
     return {};
   }
 
-  usize total = 0;
-  for (; total < size;)
-  {
-    usize position = offset + total;
-    OVERLAPPED overlapped = {};
-    overlapped.Offset = static_cast<DWORD>(position);
-    overlapped.OffsetHigh = static_cast<DWORD>(position >> 32);
-
-    DWORD chunk = Minimum(size - total, WIN32_FILE_IO_CHUNK_SIZE);
-    DWORD read = 0;
-    if (!ReadFile(file.handle, ptr + total, chunk, &read, &overlapped) || read == 0)
-    {
-      break;
-    }
-    total += read;
-  }
-
-  ArenaPopBy(arena, size - total);
-  return {{ptr, total}, total == size};
+  usize read = Win32_FileReadToBuffer(file, offset, buffer);
+  ArenaPopBy(arena, size - read);
+  return {{buffer.ptr, read}, read == size};
 }
 
 // returns how many bytes were written, less than data.count on failure.
@@ -152,7 +158,7 @@ inline bool Win32_FileSetSize(Win32_File file, usize size)
 {
   assert(file.handle != nullptr && "file isn't open");
   FILE_END_OF_FILE_INFO endOfFile = {};
-  endOfFile.EndOfFile.QuadPart = static_cast<LONGLONG>(size);
+  endOfFile.EndOfFile.QuadPart = size;
   return SetFileInformationByHandle(file.handle, FileEndOfFileInfo, &endOfFile, sizeof(endOfFile));
 }
 
@@ -193,4 +199,95 @@ inline bool Win32_WriteEntireFile(String path, Slice<u8> data)
   // e.g. when a network drive can't flush the data
   bool closed = Win32_FileClose(&file);
   return written && closed;
+}
+
+//
+// Pipes
+//
+
+struct Win32_Pipe_Reader
+{
+  HANDLE handle;
+};
+
+struct Win32_Pipe_Writer
+{
+  HANDLE handle;
+};
+
+struct Win32_Pipe
+{
+  Win32_Pipe_Reader reader;
+  Win32_Pipe_Writer writer;
+};
+
+[[nodiscard]]
+inline Pair<Win32_Pipe, bool> Win32_PipeCreate(u32 bufferSize = 0)
+{
+  HANDLE reader, writer;
+  if (!CreatePipe(&reader, &writer, nullptr, bufferSize))
+  {
+    return {};
+  }
+  return {{{reader}, {writer}}, true};
+}
+
+inline void Win32_PipeClose(Win32_Pipe_Reader *reader)
+{
+  assert(reader->handle != nullptr && "closing a pipe reader that isn't open");
+  CloseHandle(reader->handle);
+  *reader = {};
+}
+
+inline void Win32_PipeClose(Win32_Pipe_Writer *writer)
+{
+  assert(writer->handle != nullptr && "closing a pipe writer that isn't open");
+  CloseHandle(writer->handle);
+  *writer = {};
+}
+
+// returns false once every writer is closed.
+[[nodiscard]]
+inline Pair<usize, bool> Win32_PipeReadBlocking(Win32_Pipe_Reader reader, Slice<u8> buffer)
+{
+  assert(reader.handle != nullptr && "pipe reader isn't open");
+
+  DWORD chunk = Minimum(buffer.count, WIN32_FILE_IO_CHUNK_SIZE);
+  DWORD bytesRead = 0;
+  bool open = ReadFile(reader.handle, buffer.ptr, chunk, &bytesRead, nullptr);
+  return {bytesRead, open};
+}
+
+// returns false once every writer is closed and nothing is left to read.
+[[nodiscard]]
+inline Pair<usize, bool> Win32_PipeAvailable(Win32_Pipe_Reader reader)
+{
+  assert(reader.handle != nullptr && "pipe reader isn't open");
+
+  DWORD bytesAvailable = 0;
+  bool open = PeekNamedPipe(reader.handle, nullptr, 0, nullptr, &bytesAvailable, nullptr);
+  return {bytesAvailable, open};
+}
+
+// returns false once the reader is closed.
+inline Pair<usize, bool> Win32_PipeWriteBlocking(Win32_Pipe_Writer writer, Slice<u8> data)
+{
+  assert(writer.handle != nullptr && "pipe writer isn't open");
+
+  usize total = 0;
+  bool open = true;
+  for (; open && total < data.count;)
+  {
+    DWORD chunk = Minimum(data.count - total, WIN32_FILE_IO_CHUNK_SIZE);
+    DWORD bytesWritten = 0;
+    open = WriteFile(writer.handle, data.ptr + total, chunk, &bytesWritten, nullptr);
+    // non-blocking pipes only: 0 bytes means the buffer is full
+    // if (bytesWritten == 0)
+    // {
+    //   break;
+    // }
+
+    total += bytesWritten;
+  }
+  return {total, open};
 }

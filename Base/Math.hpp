@@ -1,6 +1,14 @@
 #pragma once
 
 #include "Core.hpp"
+#include <math.h>
+
+[[nodiscard]] inline f32 FloorF32(f32 x) { return floorf(x); }
+[[nodiscard]] inline f32 CeilF32(f32 x) { return ceilf(x); }
+[[nodiscard]] inline f32 RoundHalfDownF32(f32 x) { return ceilf(x - 0.5f); }
+[[nodiscard]] inline f32 RoundHalfUpF32(f32 x) { return floorf(x + 0.5f); }
+[[nodiscard]] inline f32 RoundF32(f32 x) { return roundf(x); }
+[[nodiscard]] constexpr f32 LerpF32(f32 start, f32 end, f32 t) { return (1 - t) * start + t * end; }
 
 template <typename T>
 union Vector2

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "../Base/ArenaAllocator.hpp"
-#include "../Base/Math.hpp"
 #include "../Base/String.hpp"
 #include "R_Fonts.hpp"
 #include <math.h>
@@ -116,10 +115,10 @@ inline void R_PresentFrameBuffer(HWND hWnd, HDC hDC, R_FrameBuffer frameBuffer)
 }
 
 [[nodiscard]]
-inline Vector2<i32> R_PixelFrom(Vector2<f32> point)
+inline Vector2<i32> R_PositionFrom(Vector2<f32> point)
 {
-  auto x = static_cast<i32>(ceilf(point.x - 0.5f));
-  auto y = static_cast<i32>(ceilf(point.y - 0.5f));
+  i32 x = RoundHalfDownF32(point.x);
+  i32 y = RoundHalfDownF32(point.y);
   return {x, y};
 }
 
@@ -132,17 +131,19 @@ inline bool R_PointInRect(Vector2<i32> rectPosition, Vector2<i32> rectSize, Vect
   return insideX && insideY;
 }
 
-inline void R_PlotUnsafe(R_FrameBuffer *frameBuffer, Vector2<i32> position, R_B8G8R8A8 color)
+[[nodiscard]]
+inline R_B8G8R8A8 *R_PixelPtrUnsafe(R_FrameBuffer *frameBuffer, Vector2<i32> position)
 {
   auto index = static_cast<usize>(position.y) * frameBuffer->size.width + position.x;
-  frameBuffer->data.ptr[index] = color;
+  return &frameBuffer->data.ptr[index];
 }
 
 inline void R_Plot(R_FrameBuffer *frameBuffer, Vector2<i32> position, R_B8G8R8A8 color)
 {
   if (R_PointInRect({}, frameBuffer->size, position))
   {
-    R_PlotUnsafe(frameBuffer, position, color);
+    auto &pixel = *R_PixelPtrUnsafe(frameBuffer, position);
+    pixel = color;
   }
 }
 
@@ -181,7 +182,8 @@ inline void R_FillRect(R_FrameBuffer *frameBuffer,
   {
     for (auto x = left; x < right; x += 1)
     {
-      R_PlotUnsafe(frameBuffer, {x, y}, color);
+      auto &pixel = *R_PixelPtrUnsafe(frameBuffer, {x, y});
+      pixel = color;
     }
   }
 }
@@ -193,7 +195,7 @@ inline void R_PutChar(R_FrameBuffer *frameBuffer, R_BitmapFont font,
   auto bottomRight = Vector2<i32>{Minimum(font.glyphSize.width, frameBuffer->size.width - position.x),
                                   Minimum(font.glyphSize.height, frameBuffer->size.height - position.y)};
 
-  const u8 *rows = font.bitmap.ptr + static_cast<usize>(c) * font.glyphSize.height;
+  const u8 *rows = font.bitmap.ptr + c * font.glyphSize.height;
   for (auto y = topLeft.y; y < bottomRight.y; y += 1)
   {
     u8 row = rows[y];
@@ -201,7 +203,8 @@ inline void R_PutChar(R_FrameBuffer *frameBuffer, R_BitmapFont font,
     {
       if (row & (0x80u >> x))
       {
-        R_PlotUnsafe(frameBuffer, position + Vector2<i32>{x, y}, color);
+        auto &pixel = *R_PixelPtrUnsafe(frameBuffer, position + Vector2<i32>{x, y});
+        pixel = color;
       }
     }
   }
@@ -213,7 +216,7 @@ inline void R_PutStringAscii(R_FrameBuffer *frameBuffer, R_BitmapFont font,
                              Vector2<i32> position, R_B8G8R8A8 color, String text)
 {
   auto cursor = position;
-  auto tabStopWidth = static_cast<usize>(font.glyphSize.width * R_TAB_WIDTH);
+  usize tabStopWidth = font.glyphSize.width * R_TAB_WIDTH;
   for (char c : text)
   {
     if (c == '\n')
@@ -228,12 +231,12 @@ inline void R_PutStringAscii(R_FrameBuffer *frameBuffer, R_BitmapFont font,
     else if (c == '\t')
     {
       // moves at least one glyph, so a tab right at a stop goes to the next one
-      auto offset = static_cast<usize>(cursor.x - position.x + font.glyphSize.width);
-      cursor.x = position.x + static_cast<i32>(AlignForward(offset, tabStopWidth));
+      usize offset = cursor.x - position.x + font.glyphSize.width;
+      cursor.x = position.x + AlignForward(offset, tabStopWidth);
     }
     else
     {
-      R_PutChar(frameBuffer, font, cursor, color, static_cast<u8>(c));
+      R_PutChar(frameBuffer, font, cursor, color, c);
       cursor.x += font.glyphSize.width;
     }
   }
@@ -247,7 +250,7 @@ inline Vector2<i32> R_MeasureStringAscii(R_BitmapFont font, String text)
     return {};
   }
 
-  auto tabStopWidth = static_cast<usize>(font.glyphSize.width * R_TAB_WIDTH);
+  usize tabStopWidth = font.glyphSize.width * R_TAB_WIDTH;
   i32 lineWidth = 0;
   i32 maxWidth = 0;
   i32 lineCount = 1;
@@ -260,8 +263,8 @@ inline Vector2<i32> R_MeasureStringAscii(R_BitmapFont font, String text)
     }
     else if (c == '\t')
     {
-      auto offset = static_cast<usize>(lineWidth + font.glyphSize.width);
-      lineWidth = static_cast<i32>(AlignForward(offset, tabStopWidth));
+      usize offset = lineWidth + font.glyphSize.width;
+      lineWidth = AlignForward(offset, tabStopWidth);
     }
     else
     {

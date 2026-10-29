@@ -4,14 +4,24 @@
 #include "Types.hpp"
 #include <assert.h>
 
-#define DoNotUseThisGlue(A, B) A##B
-#define Glue(A, B) DoNotUseThisGlue(A, B)
+#if IS_COMPILER_MSVC
+#include <intrin.h>
+#endif
+
+#if IS_COMPILER_MSVC
+#define Trap() __debugbreak()
+#elif IS_COMPILER_CLANG
+#define Trap() __builtin_trap()
+#endif
 
 #if IS_COMPILER_CLANG
 #define PrintfLike(fmtIndex, argsIndex) __attribute__((format(printf, fmtIndex, argsIndex)))
 #else
 #define PrintfLike(fmtIndex, argsIndex)
 #endif
+
+#define DoNotUseThisGlue(A, B) A##B
+#define Glue(A, B) DoNotUseThisGlue(A, B)
 
 template <typename F>
 struct DoNotUseThis_Defer_Scope

@@ -26,37 +26,23 @@ void UpdateTitle(HWND hWnd, f32 frameTime)
   frameCounter += 1;
 }
 
-[[nodiscard]] constexpr f32 LerpF32(f32 start, f32 end, f32 t)
+void R_BlendPixelUnsafe(R_FrameBuffer *frameBuffer, Vector2<i32> position, R_B8G8R8A8 color, f32 coverage)
 {
-  return (1 - t) * start + t * end;
-}
-
-[[nodiscard]] constexpr Vector2<f32> Lerp2F32(Vector2<f32> start, Vector2<f32> end, f32 t)
-{
-  return {LerpF32(start.x, end.x, t), LerpF32(start.y, end.y, t)};
-}
-
-// coverage 0 keeps the pixel, 1 replaces it with color
-void BlendPixelUnsafe(R_FrameBuffer *frameBuffer, Vector2<i32> position, R_B8G8R8A8 color, f32 coverage)
-{
-  auto &pixel = frameBuffer->data.ptr[static_cast<usize>(position.y) * frameBuffer->size.width + position.x];
+  auto &pixel = *R_PixelPtrUnsafe(frameBuffer, position);
   for (auto i = 0; i < 4; i += 1)
   {
-    f32 blended = pixel.data[i] + (color.data[i] - pixel.data[i]) * coverage;
-    pixel.data[i] = static_cast<u8>(blended + 0.5f);
+    f32 blended = LerpF32(pixel.data[i], color.data[i], coverage);
+    pixel.data[i] = RoundF32(blended);
   }
 }
 
-// pixel (x, y) covers the area from (x, y) to (x + 1, y + 1).
-// edge pixels the rect only partly covers get the color mixed in by the covered fraction.
-void FillRectAntialiased(R_FrameBuffer *frameBuffer, Vector2<f32> position, Vector2<f32> size, R_B8G8R8A8 color)
+void R_FillRectAntialiased(R_FrameBuffer *frameBuffer, Vector2<f32> position, Vector2<f32> size, R_B8G8R8A8 color)
 {
   auto bottomRight = position + size;
-
-  auto left = Maximum(0, static_cast<i32>(floorf(position.x)));
-  auto top = Maximum(0, static_cast<i32>(floorf(position.y)));
-  auto right = Minimum(static_cast<i32>(ceilf(bottomRight.x)), frameBuffer->size.width);
-  auto bottom = Minimum(static_cast<i32>(ceilf(bottomRight.y)), frameBuffer->size.height);
+  i32 left = Maximum(0, static_cast<i32>(FloorF32(position.x)));
+  i32 top = Maximum(0, static_cast<i32>(FloorF32(position.y)));
+  i32 right = Minimum(static_cast<i32>(CeilF32(bottomRight.x)), frameBuffer->size.width);
+  i32 bottom = Minimum(static_cast<i32>(CeilF32(bottomRight.y)), frameBuffer->size.height);
 
   for (auto y = top; y < bottom; y += 1)
   {
@@ -67,11 +53,12 @@ void FillRectAntialiased(R_FrameBuffer *frameBuffer, Vector2<f32> position, Vect
       f32 coverage = coverageX * coverageY;
       if (coverage >= 1.0f)
       {
-        R_PlotUnsafe(frameBuffer, {x, y}, color);
+        auto &pixel = *R_PixelPtrUnsafe(frameBuffer, {x, y});
+        pixel = color;
       }
       else
       {
-        BlendPixelUnsafe(frameBuffer, {x, y}, color, coverage);
+        R_BlendPixelUnsafe(frameBuffer, {x, y}, color, coverage);
       }
     }
   }
@@ -107,7 +94,7 @@ int main()
   Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic);
   ShowWindow(hWnd, SW_SHOWMAXIMIZED);
 
-  auto [arena, arenaOk] = ArenaInit();
+  auto arena = ArenaInit();
   auto frameBuffer = R_CreateFrameBuffer(&arena, frameBufferSize);
 
   auto timeNow = Win32_NowNanoseconds();
@@ -136,12 +123,12 @@ int main()
       Defer(R_PresentFrameBuffer(hWnd, hDC, frameBuffer););
 
       position += {20 * frameTime, 16 * frameTime};
-      // R_FillRect(&frameBuffer, R_PixelFrom(position), {32 * 2, 24 * 2}, R_CGA_LIGHT_RED);
-      // FillRectAntialiased(&frameBuffer, position + Vector2<f32>{0, 40 * 2}, {32 * 2, 24 * 2}, R_CGA_LIGHT_RED);
+      R_FillRect(&frameBuffer, R_PositionFrom(position), {32 * 2, 24 * 2}, R_CGA_LIGHT_RED);
+      R_FillRectAntialiased(&frameBuffer, position + Vector2<f32>{0, 40 * 2}, {32 * 2, 24 * 2}, R_CGA_LIGHT_RED);
 
       R_HexDump(&frameBuffer, R_FONT_COURIER, {}, (void *)main, 16, 48);
     }
 
-    DwmFlush();
+    // DwmFlush();
   }
 }

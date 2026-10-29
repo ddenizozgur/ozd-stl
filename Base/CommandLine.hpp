@@ -16,7 +16,7 @@ inline Slice<String> Win32_CommandLineArgs(Arena_Allocator *arena)
   }
   Defer(LocalFree(args16););
 
-  auto res = ArenaPushSlice<String>(arena, static_cast<usize>(count));
+  auto res = ArenaPushSlice<String>(arena, count);
   for (usize i = 0; i < res.count; i += 1)
   {
     res[i] = Win32_StringFrom16(arena, {args16[i], wcslen(args16[i])});

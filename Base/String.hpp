@@ -2,6 +2,7 @@
 
 #include "ArenaAllocator.hpp"
 #include "Slice.hpp"
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -24,7 +25,7 @@ PrintfLike(2, 0) inline String StringFmtV(Arena_Allocator *arena, const char *fm
     return {};
   }
 
-  auto res = ArenaPushSlice<char>(arena, static_cast<usize>(length) + 1);
+  auto res = ArenaPushSlice<char>(arena, length + 1);
   if (res.ptr == nullptr)
   {
     return {};
@@ -107,7 +108,8 @@ inline char *CStringFrom(Arena_Allocator *arena, String source)
 [[nodiscard]]
 inline String Win32_StringFrom16(Arena_Allocator *arena, String16 source)
 {
-  i32 sourceCount = source.count;
+  assert(source.count <= INT_MAX && "Win32 converts at most INT_MAX code units");
+  i32 sourceCount = static_cast<i32>(source.count);
 
   i32 count = 0;
   if (sourceCount != 0)
@@ -115,7 +117,7 @@ inline String Win32_StringFrom16(Arena_Allocator *arena, String16 source)
     count = WideCharToMultiByte(CP_UTF8, 0, source.ptr, sourceCount, nullptr, 0, nullptr, nullptr);
   }
 
-  auto res = ArenaPushSlice<char>(arena, static_cast<usize>(count) + 1);
+  auto res = ArenaPushSlice<char>(arena, count + 1);
   if (res.ptr == nullptr)
   {
     return {};
@@ -133,7 +135,8 @@ inline String Win32_StringFrom16(Arena_Allocator *arena, String16 source)
 [[nodiscard]]
 inline String16 Win32_String16From(Arena_Allocator *arena, String source)
 {
-  i32 sourceCount = source.count;
+  assert(source.count <= INT_MAX && "Win32 converts at most INT_MAX code units");
+  i32 sourceCount = static_cast<i32>(source.count);
 
   i32 count = 0;
   if (sourceCount != 0)
@@ -141,7 +144,7 @@ inline String16 Win32_String16From(Arena_Allocator *arena, String source)
     count = MultiByteToWideChar(CP_UTF8, 0, source.ptr, sourceCount, nullptr, 0);
   }
 
-  auto res = ArenaPushSlice<wchar_t>(arena, static_cast<usize>(count) + 1);
+  auto res = ArenaPushSlice<wchar_t>(arena, count + 1);
   if (res.ptr == nullptr)
   {
     return {};
