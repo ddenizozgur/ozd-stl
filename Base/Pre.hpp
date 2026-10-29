@@ -29,7 +29,7 @@
 #error Compiler not supported.
 #endif
 
-// for -Wundef
+// only exist for -Wundef
 #if !defined(IS_ARCH_X64)
 #define IS_ARCH_X64 0
 #endif

@@ -43,7 +43,7 @@ constexpr usize MagicRingEmptyCount(const Magic_Ring_Buffer *ring)
   return ring->data.count - MagicRingFilledCount(ring);
 }
 
-// contiguous even across the end of the buffer
+// contiguous even after the end
 [[nodiscard]]
 inline Slice<u8> MagicRingEmptySlice(Magic_Ring_Buffer *ring)
 {
@@ -57,7 +57,7 @@ inline void MagicRingFill(Magic_Ring_Buffer *ring, usize count)
   ring->filledEnd += count;
 }
 
-// contiguous even across the end of the buffer
+// contiguous even after the end
 [[nodiscard]]
 inline Slice<u8> MagicRingFilledSlice(Magic_Ring_Buffer *ring)
 {

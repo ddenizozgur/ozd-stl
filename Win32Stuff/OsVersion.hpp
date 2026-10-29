@@ -11,7 +11,7 @@ struct Win32_Os_Version
 {
   u32 major, minor, build; // Windows 11 still says 10.0
   u32 revision;
-  String release; // "25H2", or "1909" on older Windows 10, empty if unknown
+  String release; // empty if unknown
   bool server;
 };
 
@@ -75,7 +75,6 @@ inline const Win32_Os_Version &Win32_OsVersion()
   return win32OsVersion.version;
 }
 
-// Windows 11 still says 10.0
 [[nodiscard]]
 inline bool Win32_IsWindows11OrGreater()
 {

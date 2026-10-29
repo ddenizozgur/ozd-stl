@@ -168,7 +168,6 @@ inline Dialog_Result Win32_TaskDialog(HWND owner, String title, String instructi
     auto instruction16 = Win32_String16From(scratch.arena, instruction);
     auto content16 = Win32_String16From(scratch.arena, content);
 
-    // an empty string still takes up a line, nullptr leaves the part out
     auto hResult = win32TaskDialog(owner, nullptr, title16.ptr,
                                    instruction.count != 0 ? instruction16.ptr : nullptr,
                                    content.count != 0 ? content16.ptr : nullptr,

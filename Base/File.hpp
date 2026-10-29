@@ -71,7 +71,7 @@ Win32_FileOpen(String path,
   return {{handle}, true};
 }
 
-// false can mean the written data never reached the disk (e.g. a network drive)
+// false can mean the written data never arrived, e.g. file in a shared network folder
 inline bool Win32_FileClose(Win32_File *file)
 {
   assert(file->handle != nullptr && "closing a file that isn't open");
@@ -196,7 +196,6 @@ inline bool Win32_WriteEntireFile(String path, Slice<u8> data)
   }
 
   bool written = Win32_FileSetSize(file, 0) && Win32_FileWrite(file, 0, data) == data.count;
-  // e.g. when a network drive can't flush the data
   bool closed = Win32_FileClose(&file);
   return written && closed;
 }
@@ -204,7 +203,6 @@ inline bool Win32_WriteEntireFile(String path, Slice<u8> data)
 //
 // Pipes
 //
-
 struct Win32_Pipe_Reader
 {
   HANDLE handle;
@@ -281,7 +279,7 @@ inline Pair<usize, bool> Win32_PipeWriteBlocking(Win32_Pipe_Writer writer, Slice
     DWORD chunk = Minimum(data.count - total, WIN32_FILE_IO_CHUNK_SIZE);
     DWORD bytesWritten = 0;
     open = WriteFile(writer.handle, data.ptr + total, chunk, &bytesWritten, nullptr);
-    // non-blocking pipes only: 0 bytes means the buffer is full
+    // NOTE: do this for non-blocking pipes
     // if (bytesWritten == 0)
     // {
     //   break;

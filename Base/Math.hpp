@@ -27,7 +27,7 @@ union Vector2
     T width, height;
   };
 
-  // these only exist for -Wmissing-braces
+  // only exist for -Wmissing-braces
   Vector2() = default;
   constexpr Vector2(T left, T right) : data{left, right} {}
 };

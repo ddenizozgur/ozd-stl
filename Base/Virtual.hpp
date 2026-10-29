@@ -87,7 +87,6 @@ inline Slice<u8> Win32_VirtualReserveRepeated(usize size)
   // so rounding up to 64 KiB would cost real memory
   size = AlignForwardPow2(size, Win32_PageSize());
 
-  // reserve 2 * size
   auto placeholder = static_cast<u8 *>(VirtualAlloc2(nullptr, nullptr, 2 * size,
                                                      MEM_RESERVE | MEM_RESERVE_PLACEHOLDER,
                                                      PAGE_NOACCESS, nullptr, 0));
@@ -96,7 +95,7 @@ inline Slice<u8> Win32_VirtualReserveRepeated(usize size)
     Trap();
   }
 
-  // split into two placeholders
+  // split into two
   if (!VirtualFree(placeholder, size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER))
   {
     Trap();

@@ -34,7 +34,6 @@ inline bool Win32_SetDarkTheme(HWND hWnd, Window_Backdrop backdrop)
                                        &darkTitleBar, sizeof(darkTitleBar));
   bool ok = SUCCEEDED(hResult);
 
-  // extending the frame over the whole client area lets the backdrop show through it
   i32 margin = backdrop == Window_Backdrop_None ? 0 : -1;
   MARGINS margins = {margin, margin, margin, margin};
   hResult = DwmExtendFrameIntoClientArea(hWnd, &margins);
@@ -44,7 +43,6 @@ inline bool Win32_SetDarkTheme(HWND hWnd, Window_Backdrop backdrop)
   hResult = DwmSetWindowAttribute(hWnd, DWMWA_SYSTEMBACKDROP_TYPE, &type, sizeof(type));
   ok &= SUCCEEDED(hResult);
 
-  // the title bar picks up only when the frame repaints
   RedrawWindow(hWnd, nullptr, nullptr, RDW_FRAME | RDW_INVALIDATE);
   return ok;
 }
@@ -64,7 +62,6 @@ inline bool Win32_SetLightTheme(HWND hWnd)
   hResult = DwmSetWindowAttribute(hWnd, DWMWA_SYSTEMBACKDROP_TYPE, &type, sizeof(type));
   ok &= SUCCEEDED(hResult);
 
-  // the title bar picks up only when the frame repaints
   RedrawWindow(hWnd, nullptr, nullptr, RDW_FRAME | RDW_INVALIDATE);
   return ok;
 }

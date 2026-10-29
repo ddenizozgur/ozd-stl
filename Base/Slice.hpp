@@ -3,7 +3,6 @@
 #include "Core.hpp"
 #include <string.h>
 
-// non-owning view over contiguous memory.
 template <typename T>
 struct Slice
 {
@@ -24,7 +23,6 @@ struct Slice
     return ptr[index];
   }
 
-  // for range-based for loops
   [[nodiscard]] constexpr T *begin() { return ptr; }
   [[nodiscard]] constexpr T *end() { return ptr + count; }
   [[nodiscard]] constexpr const T *begin() const { return ptr; }

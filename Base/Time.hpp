@@ -8,8 +8,6 @@
 [[nodiscard]]
 inline u64 Win32_PerformanceFrequency()
 {
-  // Windows keeps it in memory shared with every process,
-  // so reading it is a plain load, no system call
   LARGE_INTEGER frequency;
   QueryPerformanceFrequency(&frequency);
   return frequency.QuadPart;
