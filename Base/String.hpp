@@ -157,3 +157,9 @@ inline String16 Win32_String16From(Arena_Allocator *arena, String source)
   res.ptr[count] = 0;
   return {res.ptr, static_cast<usize>(count)};
 }
+
+[[nodiscard]]
+inline bool StringEqual(String a, String b)
+{
+  return a.count == b.count && (a.count == 0 || memcmp(a.ptr, b.ptr, a.count) == 0);
+}
