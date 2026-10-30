@@ -138,6 +138,16 @@ inline R_B8G8R8A8 *R_PixelPtrUnsafe(R_FrameBuffer *frameBuffer, Vector2<i32> pos
   return &frameBuffer->data.ptr[index];
 }
 
+inline void R_BlendPixelUnsafe(R_FrameBuffer *frameBuffer, Vector2<i32> position, R_B8G8R8A8 color, f32 coverage)
+{
+  auto &pixel = *R_PixelPtrUnsafe(frameBuffer, position);
+  for (auto i = 0; i < 4; i += 1)
+  {
+    f32 blended = LerpF32(pixel.data[i], color.data[i], coverage);
+    pixel.data[i] = RoundF32(blended);
+  }
+}
+
 inline void R_Plot(R_FrameBuffer *frameBuffer, Vector2<i32> position, R_B8G8R8A8 color)
 {
   if (R_PointInRect({}, frameBuffer->size, position))

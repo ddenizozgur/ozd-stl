@@ -35,16 +35,6 @@ void UpdateTitle(HWND hWnd, f32 frameTime)
   frameCounter += 1;
 }
 
-void R_BlendPixelUnsafe(R_FrameBuffer *frameBuffer, Vector2<i32> position, R_B8G8R8A8 color, f32 coverage)
-{
-  auto &pixel = *R_PixelPtrUnsafe(frameBuffer, position);
-  for (auto i = 0; i < 4; i += 1)
-  {
-    f32 blended = LerpF32(pixel.data[i], color.data[i], coverage);
-    pixel.data[i] = RoundF32(blended);
-  }
-}
-
 void R_FillRectAntialiased(R_FrameBuffer *frameBuffer, Vector2<f32> position, Vector2<f32> size, R_B8G8R8A8 color)
 {
   auto bottomRight = position + size;
