@@ -219,6 +219,7 @@ struct Win32_Pipe
   Win32_Pipe_Writer writer;
 };
 
+// zero means Windows default
 [[nodiscard]]
 inline Pair<Win32_Pipe, bool> Win32_PipeCreate(u32 bufferSize = 0)
 {
@@ -268,6 +269,7 @@ inline Pair<usize, bool> Win32_PipeAvailable(Win32_Pipe_Reader reader)
 }
 
 // returns false once the reader is closed.
+[[nodiscard]]
 inline Pair<usize, bool> Win32_PipeWriteBlocking(Win32_Pipe_Writer writer, Slice<u8> data)
 {
   assert(writer.handle != nullptr && "pipe writer isn't open");

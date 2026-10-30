@@ -2,4 +2,5 @@ Build/
 *.exe
 *.pdb
 zFindings/
-zExample/
+DX11Example/
+DX11Stuff/

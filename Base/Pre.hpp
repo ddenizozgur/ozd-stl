@@ -29,6 +29,13 @@
 #error Compiler not supported.
 #endif
 
+// release builds define NDEBUG
+#if defined(NDEBUG)
+#define IS_DEBUG 0
+#else
+#define IS_DEBUG 1
+#endif
+
 // only exist for -Wundef
 #if !defined(IS_ARCH_X64)
 #define IS_ARCH_X64 0
