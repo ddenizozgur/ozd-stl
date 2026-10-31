@@ -8,8 +8,8 @@
 #include "../DX11Stuff/Swapchain.hpp"
 #include "../DX11Stuff/Texture.hpp"
 #include "../Win32Stuff/Com.hpp"
-#include "../Win32Stuff/Image.hpp"
 #include "../Win32Stuff/Theme.hpp"
+#include "../Win32Stuff/WicImage.hpp"
 #include "../Win32Stuff/WindowRelated.hpp"
 
 struct Example_Globals
@@ -76,6 +76,8 @@ int main()
                               nullptr, nullptr, hInstance, nullptr);
   Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic);
 
+  Defer(DX11_ReportLiveObjects(););
+
   auto factory6 = DX11_CreateFactory6();
   Defer(Win32_ComSafeRelease(&factory6););
 
@@ -95,7 +97,7 @@ int main()
 
   String imagePath = Win32_PathFromExe(&arena, StringLit("../Assets/Pattern.png"));
   auto [fileBytes, fileOk] = Win32_ReadEntireFile(&arena, imagePath);
-  auto [image, imageOk] = Win32_DecodeImageAs(&arena, fileBytes, Image_Format_RGBA8Premultiplied);
+  auto [image, imageOk] = Win32_WicDecodeImageAs(&arena, fileBytes, Image_Format_RGBA8Premultiplied);
   DXGI_FORMAT textureFormat = DX11_TextureFormatFromImage(image.format, true);
   auto [texture, textureOk] = DX11_CreateTexture2D(gpu, image.size, textureFormat, image.pixels, true);
   Defer(DX11_ReleaseTexture2D(&texture););
@@ -158,8 +160,6 @@ int main()
 
     DX11_PresentSwapchain(swapchain, 0);
   }
-
-  DX11_ReportLiveObjects();
 }
 
 inline LRESULT CALLBACK ExampleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)

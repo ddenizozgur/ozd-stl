@@ -114,7 +114,7 @@ inline IWICImagingFactory *Win32_CreateWicFactory_()
 // false when the bytes aren't an image Windows can read.
 [[nodiscard]]
 inline Pair<Win32_Image, bool>
-Win32_DecodeImageAs(Arena_Allocator *arena, Slice<u8> fileBytes, Image_Format destFormat)
+Win32_WicDecodeImageAs(Arena_Allocator *arena, Slice<u8> fileBytes, Image_Format destFormat)
 {
   IWICImagingFactory *factory = Win32_CreateWicFactory_();
   if (factory == nullptr)
@@ -175,7 +175,7 @@ Win32_DecodeImageAs(Arena_Allocator *arena, Slice<u8> fileBytes, Image_Format de
 // JPEG drops alpha.
 [[nodiscard]]
 inline Pair<Slice<u8>, bool>
-Win32_EncodeImageAs(Arena_Allocator *arena, Win32_Image image, Image_File_Format fileFormat)
+Win32_WicEncodeImageAs(Arena_Allocator *arena, Win32_Image image, Image_File_Format fileFormat)
 {
   IWICImagingFactory *factory = Win32_CreateWicFactory_();
   if (factory == nullptr)

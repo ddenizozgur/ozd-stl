@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../Base/ArenaAllocator.hpp"
 #include "../Base/Core.hpp"
 #include "../Win32Stuff/Com.hpp"
 #include <stdio.h>
@@ -181,15 +182,34 @@ inline void DX11_ReleaseGPU(DX11_GPU *gpu)
   Win32_ComSafeRelease(&gpu->adapter1);
 }
 
-// Prints COM objects that were never released to the debugger output.
-// Call it after releasing the device and the factory. Needs the 'Graphics Tools' optional Windows feature.
+// Needs the 'Graphics Tools' optional Windows feature.
 inline void DX11_ReportLiveObjects()
 {
   IDXGIDebug1 *debug = nullptr;
-  if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug))))
+  if (FAILED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug))))
   {
-    auto rloFlags = static_cast<DXGI_DEBUG_RLO_FLAGS>(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL);
-    debug->ReportLiveObjects(DXGI_DEBUG_ALL, rloFlags);
-    debug->Release();
+    return;
+  }
+  Defer(debug->Release(););
+
+  IDXGIInfoQueue *queue = nullptr;
+  DXGIGetDebugInterface1(0, IID_PPV_ARGS(&queue));
+  Defer(queue->Release(););
+
+  queue->ClearStoredMessages(DXGI_DEBUG_ALL);
+  auto rloFlags = static_cast<DXGI_DEBUG_RLO_FLAGS>(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL);
+  debug->ReportLiveObjects(DXGI_DEBUG_ALL, rloFlags);
+
+  auto scratch = ScratchBegin();
+  Defer(ScratchEnd(scratch););
+
+  UINT64 count = queue->GetNumStoredMessages(DXGI_DEBUG_ALL);
+  for (UINT64 i = 0; i < count; i += 1)
+  {
+    SIZE_T size = 0;
+    queue->GetMessage(DXGI_DEBUG_ALL, i, nullptr, &size);
+    auto *message = static_cast<DXGI_INFO_QUEUE_MESSAGE *>(ArenaPushEx(scratch.arena, size, alignof(DXGI_INFO_QUEUE_MESSAGE)));
+    queue->GetMessage(DXGI_DEBUG_ALL, i, message, &size);
+    fprintf(stderr, "%s\n", message->pDescription);
   }
 }

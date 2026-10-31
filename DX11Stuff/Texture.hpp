@@ -2,7 +2,7 @@
 
 #include "../Base/Math.hpp"
 #include "../Base/Slice.hpp"
-#include "../Win32Stuff/Image.hpp"
+#include "../Win32Stuff/WicImage.hpp"
 #include "GPU.hpp"
 
 struct DX11_Texture2D
