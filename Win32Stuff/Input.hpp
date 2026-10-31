@@ -11,8 +11,7 @@
 [[nodiscard]]
 inline u32 Win32_MillisecondsSinceLastInput()
 {
-  LASTINPUTINFO info = {};
-  info.cbSize = sizeof(info);
+  LASTINPUTINFO info = {.cbSize = sizeof(info)};
   GetLastInputInfo(&info);
   return GetTickCount() - info.dwTime;
 }

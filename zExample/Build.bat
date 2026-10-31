@@ -13,7 +13,7 @@ for %%a in (%*) do (
   if "%%a"=="run" set run=1
 )
 
-set compileFlags=-std=c++17 -Wall -Wextra -Wundef -fno-exceptions -fno-rtti -msse4.1 -I. %mode%
+set compileFlags=-std=c++20 -Wall -Wextra -Wundef -fno-exceptions -fno-rtti -msse4.1 -I. %mode%
 set linkFlags=-Xlinker /NODEFAULTLIB:libcpmt.lib -Xlinker /NODEFAULTLIB:msvcprt.lib
 
 if not exist Build mkdir Build

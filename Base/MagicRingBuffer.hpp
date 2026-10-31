@@ -20,9 +20,7 @@ struct Magic_Ring_Buffer
 [[nodiscard]]
 inline Magic_Ring_Buffer MagicRingInit(usize reserveSize)
 {
-  Magic_Ring_Buffer res = {};
-  res.data = Win32_VirtualReserveRepeated(reserveSize);
-  return res;
+  return {.data = Win32_VirtualReserveRepeated(reserveSize)};
 }
 
 inline void MagicRingFree(Magic_Ring_Buffer *ring)

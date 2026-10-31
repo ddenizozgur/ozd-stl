@@ -163,3 +163,65 @@ inline bool StringEqual(String a, String b)
 {
   return a.count == b.count && (a.count == 0 || memcmp(a.ptr, b.ptr, a.count) == 0);
 }
+
+// Index of the last character that is one of chars, or s.count when there is none.
+[[nodiscard]]
+constexpr usize StringFindLast(String s, String chars)
+{
+  for (usize i = s.count; i > 0; i -= 1)
+  {
+    for (char c : chars)
+    {
+      if (s.ptr[i - 1] == c)
+      {
+        return i - 1;
+      }
+    }
+  }
+  return s.count;
+}
+
+// If none of chars is in s, Before returns all of s and After returns an empty string.
+[[nodiscard]]
+constexpr String StringBeforeLast(String s, String chars)
+{
+  String res = s;
+  if (usize i = StringFindLast(s, chars); i != s.count)
+  {
+    res = {s.ptr, i};
+  }
+  return res;
+}
+
+[[nodiscard]]
+constexpr String StringBeforeLastInclusive(String s, String chars)
+{
+  String res = s;
+  if (usize i = StringFindLast(s, chars); i != s.count)
+  {
+    res = {s.ptr, i + 1};
+  }
+  return res;
+}
+
+[[nodiscard]]
+constexpr String StringAfterLast(String s, String chars)
+{
+  String res = {};
+  if (usize i = StringFindLast(s, chars); i != s.count)
+  {
+    res = {s.ptr + i + 1, s.count - i - 1};
+  }
+  return res;
+}
+
+[[nodiscard]]
+constexpr String StringAfterLastInclusive(String s, String chars)
+{
+  String res = {};
+  if (usize i = StringFindLast(s, chars); i != s.count)
+  {
+    res = {s.ptr + i, s.count - i};
+  }
+  return res;
+}

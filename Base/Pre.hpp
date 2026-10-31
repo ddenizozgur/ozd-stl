@@ -49,3 +49,9 @@
 #if !defined(IS_COMPILER_CLANG)
 #define IS_COMPILER_CLANG 0
 #endif
+
+#if IS_COMPILER_CLANG
+#if __has_warning("-Wmissing-designated-field-initializers")
+#pragma clang diagnostic ignored "-Wmissing-designated-field-initializers"
+#endif
+#endif

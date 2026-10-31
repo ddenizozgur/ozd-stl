@@ -43,6 +43,13 @@ constexpr Slice<T> SliceFromArray(T (&array)[N])
   return {array, N};
 }
 
+template <typename T>
+[[nodiscard]]
+constexpr Slice<u8> SliceAsBytes(Slice<T> slice)
+{
+  return {reinterpret_cast<u8 *>(slice.ptr), slice.count * sizeof(T)};
+}
+
 // [first, onePastLast)
 template <typename T>
 [[nodiscard]]

@@ -157,8 +157,7 @@ inline usize Win32_FileWrite(Win32_File file, usize offset, Slice<u8> data)
 inline bool Win32_FileSetSize(Win32_File file, usize size)
 {
   assert(file.handle != nullptr && "file isn't open");
-  FILE_END_OF_FILE_INFO endOfFile = {};
-  endOfFile.EndOfFile.QuadPart = size;
+  FILE_END_OF_FILE_INFO endOfFile = {.EndOfFile = {.QuadPart = static_cast<LONGLONG>(size)}};
   return SetFileInformationByHandle(file.handle, FileEndOfFileInfo, &endOfFile, sizeof(endOfFile));
 }
 
@@ -167,13 +166,11 @@ inline Pair<Slice<u8>, bool>
 Win32_ReadEntireFile(Arena_Allocator *arena, String path,
                      usize alignment = WIN32_FILE_READ_DEFAULT_ALIGNMENT)
 {
-  auto [opened, ok] = Win32_FileOpen(path);
+  auto [file, ok] = Win32_FileOpen(path);
   if (!ok)
   {
     return {};
   }
-  // lambdas can't capture structured bindings in C++17
-  Win32_File file = opened;
   Defer(Win32_FileClose(&file););
 
   usize size = Win32_FileSize(file);
@@ -198,6 +195,26 @@ inline bool Win32_WriteEntireFile(String path, Slice<u8> data)
   bool written = Win32_FileSetSize(file, 0) && Win32_FileWrite(file, 0, data) == data.count;
   bool closed = Win32_FileClose(&file);
   return written && closed;
+}
+
+// ends with trailing '\'.
+[[nodiscard]]
+inline String Win32_GetExeDirectory(Arena_Allocator *arena)
+{
+  wchar_t buffer[MAX_PATH];
+  usize length = GetModuleFileNameW(nullptr, buffer, MAX_PATH);
+  String exePath = Win32_StringFrom16(arena, {buffer, length});
+  return StringBeforeLastInclusive(exePath, StringLit("\\"));
+}
+
+[[nodiscard]]
+inline String Win32_PathFromExe(Arena_Allocator *arena, String relative)
+{
+  auto scratch = ScratchBegin();
+  Defer(ScratchEnd(scratch, IsScratch(arena)););
+
+  String exeDirectory = Win32_GetExeDirectory(scratch.arena);
+  return StringFmt(arena, "%.*s%.*s", StringArgs(exeDirectory), StringArgs(relative));
 }
 
 //

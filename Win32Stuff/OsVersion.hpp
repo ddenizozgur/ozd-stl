@@ -27,8 +27,7 @@ inline BOOL CALLBACK Win32_OsVersionInit(PINIT_ONCE, PVOID, PVOID *)
 {
   auto version = &win32OsVersion.version;
 
-  OSVERSIONINFOEXW info = {};
-  info.dwOSVersionInfoSize = sizeof(info);
+  OSVERSIONINFOEXW info = {.dwOSVersionInfoSize = sizeof(info)};
   RtlGetVersion(reinterpret_cast<RTL_OSVERSIONINFOW *>(&info));
   version->major = info.dwMajorVersion;
   version->minor = info.dwMinorVersion;

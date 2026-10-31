@@ -11,9 +11,7 @@ struct Bump_Allocator
 [[nodiscard]]
 constexpr Bump_Allocator BumpInit(Slice<u8> backingBuffer)
 {
-  Bump_Allocator res = {};
-  res.backingBuffer = backingBuffer;
-  return res;
+  return {.backingBuffer = backingBuffer};
 }
 
 [[nodiscard]]

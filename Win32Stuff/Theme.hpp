@@ -68,8 +68,7 @@ inline bool Win32_SetLightTheme(HWND hWnd)
 
 inline bool Win32_SystemUsesDarkTheme()
 {
-  HIGHCONTRASTW highContrast = {};
-  highContrast.cbSize = sizeof(highContrast);
+  HIGHCONTRASTW highContrast = {.cbSize = sizeof(highContrast)};
   bool ok = SystemParametersInfoW(SPI_GETHIGHCONTRAST, sizeof(highContrast), &highContrast, 0);
   if (ok && (highContrast.dwFlags & HCF_HIGHCONTRASTON) != 0)
   {

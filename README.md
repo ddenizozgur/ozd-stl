@@ -1,6 +1,6 @@
 # ozd-stl
 
-A work-in-progress base layer for C++17. Windows only for now.
+A work-in-progress base layer for C++20. Windows only for now.
 
 ## Requirements
 

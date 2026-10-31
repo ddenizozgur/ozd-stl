@@ -32,13 +32,14 @@ inline bool Win32_EnableVisualStyles()
     return false;
   }
 
-  ACTCTXW context = {};
-  context.cbSize = sizeof(context);
-  context.dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID | ACTCTX_FLAG_ASSEMBLY_DIRECTORY_VALID |
-                    ACTCTX_FLAG_SET_PROCESS_DEFAULT;
-  context.lpSource = L"shell32.dll";
-  context.lpAssemblyDirectory = sysDir;
-  context.lpResourceName = MAKEINTRESOURCEW(WIN32_SHELL32_MANIFEST_RESOURCE_ID);
+  ACTCTXW context = {
+      .cbSize = sizeof(context),
+      .dwFlags = ACTCTX_FLAG_RESOURCE_NAME_VALID | ACTCTX_FLAG_ASSEMBLY_DIRECTORY_VALID |
+                 ACTCTX_FLAG_SET_PROCESS_DEFAULT,
+      .lpSource = L"shell32.dll",
+      .lpAssemblyDirectory = sysDir,
+      .lpResourceName = MAKEINTRESOURCEW(WIN32_SHELL32_MANIFEST_RESOURCE_ID),
+  };
   HANDLE handle = CreateActCtxW(&context);
   if (handle == INVALID_HANDLE_VALUE)
   {

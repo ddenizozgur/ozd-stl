@@ -1,6 +1,5 @@
+.vscode
 Build/
 *.exe
 *.pdb
 zFindings/
-DX11Example/
-DX11Stuff/

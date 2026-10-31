@@ -19,7 +19,6 @@ struct Arena_Allocator
 inline Arena_Allocator ArenaInit(usize reserveSize = ARENA_DEFAULT_RESERVE_SIZE,
                                  usize perCommitSize = ARENA_DEFAULT_PER_COMMIT_SIZE)
 {
-  // costs nothing, memory is committed separately as the arena grows
   reserveSize = AlignForwardPow2(reserveSize, Win32_AllocationGranularity());
 
   perCommitSize = Minimum(perCommitSize, reserveSize);
@@ -27,20 +26,20 @@ inline Arena_Allocator ArenaInit(usize reserveSize = ARENA_DEFAULT_RESERVE_SIZE,
   // reserved memory is already aligned for us
   Slice<u8> reserved = Win32_VirtualReserve(reserveSize);
 
-  Arena_Allocator res = {};
-  res.bump = BumpInit(reserved);
-  res.perCommitSize = perCommitSize;
-  res.isVirtual = true;
-  return res;
+  return {
+      .bump = BumpInit(reserved),
+      .perCommitSize = perCommitSize,
+      .isVirtual = true,
+  };
 }
 
 [[nodiscard]]
 constexpr Arena_Allocator ArenaInitFromBuffer(Slice<u8> backingBuffer)
 {
-  Arena_Allocator res = {};
-  res.bump = BumpInit(backingBuffer);
-  res.committed = backingBuffer.count;
-  return res;
+  return {
+      .bump = BumpInit(backingBuffer),
+      .committed = backingBuffer.count,
+  };
 }
 
 [[nodiscard]]
@@ -161,9 +160,8 @@ inline Arena_Allocator *ScratchGetArena()
 {
   if (doNotUseThisScratch.bump.backingBuffer.ptr == nullptr)
   {
-    doNotUseThisScratch = ArenaInit(
-        SCRATCH_DEFAULT_RESERVE_SIZE,
-        ARENA_DEFAULT_PER_COMMIT_SIZE);
+    doNotUseThisScratch = ArenaInit(SCRATCH_DEFAULT_RESERVE_SIZE,
+                                    ARENA_DEFAULT_PER_COMMIT_SIZE);
   }
   return &doNotUseThisScratch;
 }
