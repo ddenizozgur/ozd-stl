@@ -30,8 +30,8 @@ DX11_CreateBackbufferView_(ID3D11Device1 *device1, IDXGISwapChain2 *swapchain2, 
   Defer(backbuffer->Release(););
 
   D3D11_RENDER_TARGET_VIEW_DESC desc = {
-      .Format = viewFormat,
-      .ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D,
+    .Format = viewFormat,
+    .ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D,
   };
 
   ID3D11RenderTargetView *view = nullptr;
@@ -53,14 +53,14 @@ DX11_CreateSwapchain(IDXGIFactory6 *factory6, DX11_GPU gpu, HWND hWnd,
   }
 
   DXGI_SWAP_CHAIN_DESC1 desc = {
-      .Format = DXGI_FORMAT_B8G8R8A8_UNORM, // flip model buffers can't be sRGB, only their views
-      .SampleDesc = {.Count = 1},
-      .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
-      .BufferCount = 2,
-      .Scaling = DXGI_SCALING_STRETCH,
-      .SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
-      .AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED,
-      .Flags = swapchainFlags,
+    .Format = DXGI_FORMAT_B8G8R8A8_UNORM, // flip model buffers can't be sRGB, only their views
+    .SampleDesc = {.Count = 1},
+    .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
+    .BufferCount = 2,
+    .Scaling = DXGI_SCALING_STRETCH,
+    .SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
+    .AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED,
+    .Flags = swapchainFlags,
   };
 
   IDXGISwapChain1 *swapchain1 = nullptr;

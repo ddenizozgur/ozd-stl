@@ -27,9 +27,9 @@ inline Arena_Allocator ArenaInit(usize reserveSize = ARENA_DEFAULT_RESERVE_SIZE,
   Slice<u8> reserved = Win32_VirtualReserve(reserveSize);
 
   return {
-      .bump = BumpInit(reserved),
-      .perCommitSize = perCommitSize,
-      .isVirtual = true,
+    .bump = BumpInit(reserved),
+    .perCommitSize = perCommitSize,
+    .isVirtual = true,
   };
 }
 
@@ -37,8 +37,8 @@ inline Arena_Allocator ArenaInit(usize reserveSize = ARENA_DEFAULT_RESERVE_SIZE,
 constexpr Arena_Allocator ArenaInitFromBuffer(Slice<u8> backingBuffer)
 {
   return {
-      .bump = BumpInit(backingBuffer),
-      .committed = backingBuffer.count,
+    .bump = BumpInit(backingBuffer),
+    .committed = backingBuffer.count,
   };
 }
 

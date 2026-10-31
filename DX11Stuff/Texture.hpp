@@ -32,14 +32,14 @@ DX11_CreateTexture2D(DX11_GPU gpu, Vector2<u32> size, DXGI_FORMAT format, Slice<
 
   auto rowPitch = static_cast<UINT>(pixels.count / pixelCount * size.width);
   D3D11_TEXTURE2D_DESC desc = {
-      .Width = size.width,
-      .Height = size.height,
-      .MipLevels = 1,
-      .ArraySize = 1,
-      .Format = format,
-      .SampleDesc = {.Count = 1},
-      .Usage = D3D11_USAGE_IMMUTABLE,
-      .BindFlags = D3D11_BIND_SHADER_RESOURCE,
+    .Width = size.width,
+    .Height = size.height,
+    .MipLevels = 1,
+    .ArraySize = 1,
+    .Format = format,
+    .SampleDesc = {.Count = 1},
+    .Usage = D3D11_USAGE_IMMUTABLE,
+    .BindFlags = D3D11_BIND_SHADER_RESOURCE,
   };
   D3D11_SUBRESOURCE_DATA data = {.pSysMem = pixels.ptr, .SysMemPitch = rowPitch};
   if (generateMips)

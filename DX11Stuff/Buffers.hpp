@@ -75,11 +75,11 @@ inline Pair<DX11_Storage_Buffer, bool>
 DX11_CreateStorageBuffer(DX11_GPU gpu, Slice<u8> bytes, u32 stride)
 {
   D3D11_BUFFER_DESC desc = {
-      .ByteWidth = static_cast<UINT>(bytes.count),
-      .Usage = D3D11_USAGE_IMMUTABLE,
-      .BindFlags = D3D11_BIND_SHADER_RESOURCE,
-      .MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED,
-      .StructureByteStride = stride,
+    .ByteWidth = static_cast<UINT>(bytes.count),
+    .Usage = D3D11_USAGE_IMMUTABLE,
+    .BindFlags = D3D11_BIND_SHADER_RESOURCE,
+    .MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED,
+    .StructureByteStride = stride,
   };
 
   auto view = DX11_CreateStructuredView_(gpu, desc, bytes.ptr);
@@ -107,12 +107,12 @@ inline Pair<DX11_Transient_Buffer, bool>
 DX11_CreateTransientBuffer(DX11_GPU gpu, u32 capacity, u32 stride)
 {
   D3D11_BUFFER_DESC desc = {
-      .ByteWidth = capacity * stride,
-      .Usage = D3D11_USAGE_DYNAMIC,
-      .BindFlags = D3D11_BIND_SHADER_RESOURCE,
-      .CPUAccessFlags = D3D11_CPU_ACCESS_WRITE,
-      .MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED,
-      .StructureByteStride = stride,
+    .ByteWidth = capacity * stride,
+    .Usage = D3D11_USAGE_DYNAMIC,
+    .BindFlags = D3D11_BIND_SHADER_RESOURCE,
+    .CPUAccessFlags = D3D11_CPU_ACCESS_WRITE,
+    .MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED,
+    .StructureByteStride = stride,
   };
 
   auto view = DX11_CreateStructuredView_(gpu, desc, nullptr);
@@ -157,10 +157,10 @@ inline Pair<DX11_Constant_Buffer, bool>
 DX11_CreateConstantBuffer(DX11_GPU gpu, u32 size)
 {
   D3D11_BUFFER_DESC desc = {
-      .ByteWidth = size,
-      .Usage = D3D11_USAGE_DYNAMIC,
-      .BindFlags = D3D11_BIND_CONSTANT_BUFFER,
-      .CPUAccessFlags = D3D11_CPU_ACCESS_WRITE,
+    .ByteWidth = size,
+    .Usage = D3D11_USAGE_DYNAMIC,
+    .BindFlags = D3D11_BIND_CONSTANT_BUFFER,
+    .CPUAccessFlags = D3D11_CPU_ACCESS_WRITE,
   };
 
   ID3D11Buffer *buffer = nullptr;
@@ -192,9 +192,9 @@ inline Pair<DX11_Index_Buffer, bool>
 DX11_CreateIndexBuffer(DX11_GPU gpu, Slice<u32> indices)
 {
   D3D11_BUFFER_DESC desc = {
-      .ByteWidth = static_cast<UINT>(indices.count * sizeof(u32)),
-      .Usage = D3D11_USAGE_IMMUTABLE,
-      .BindFlags = D3D11_BIND_INDEX_BUFFER,
+    .ByteWidth = static_cast<UINT>(indices.count * sizeof(u32)),
+    .Usage = D3D11_USAGE_IMMUTABLE,
+    .BindFlags = D3D11_BIND_INDEX_BUFFER,
   };
   D3D11_SUBRESOURCE_DATA data = {.pSysMem = indices.ptr};
 

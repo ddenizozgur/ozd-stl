@@ -1,6 +1,4 @@
-.vscode
 Bin/
 *.exe
 *.pdb
 zFindings/
-.clang-format

@@ -7,7 +7,7 @@
 #if defined(__clang__)
 #define IS_COMPILER_CLANG 1
 #if defined(__amd64__) || defined(__amd64) || \
-    defined(__x86_64__) || defined(__x86_64)
+  defined(__x86_64__) || defined(__x86_64)
 #define IS_ARCH_X64 1
 #elif defined(__aarch64__)
 #define IS_ARCH_ARM64 1

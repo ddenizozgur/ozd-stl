@@ -23,13 +23,13 @@ inline Pair<DX11_Render_Target, bool>
 DX11_CreateRenderTarget(DX11_GPU gpu, Vector2<u32> size, DXGI_FORMAT format)
 {
   D3D11_TEXTURE2D_DESC desc = {
-      .Width = size.width,
-      .Height = size.height,
-      .MipLevels = 1,
-      .ArraySize = 1,
-      .Format = format,
-      .SampleDesc = {.Count = 1},
-      .BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE,
+    .Width = size.width,
+    .Height = size.height,
+    .MipLevels = 1,
+    .ArraySize = 1,
+    .Format = format,
+    .SampleDesc = {.Count = 1},
+    .BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE,
   };
 
   ID3D11Texture2D *texture = nullptr;
@@ -71,13 +71,13 @@ inline Pair<DX11_Depth_Target, bool>
 DX11_CreateDepthTarget(DX11_GPU gpu, Vector2<u32> size, DXGI_FORMAT format = DXGI_FORMAT_D32_FLOAT)
 {
   D3D11_TEXTURE2D_DESC desc = {
-      .Width = size.width,
-      .Height = size.height,
-      .MipLevels = 1,
-      .ArraySize = 1,
-      .Format = format,
-      .SampleDesc = {.Count = 1},
-      .BindFlags = D3D11_BIND_DEPTH_STENCIL,
+    .Width = size.width,
+    .Height = size.height,
+    .MipLevels = 1,
+    .ArraySize = 1,
+    .Format = format,
+    .SampleDesc = {.Count = 1},
+    .BindFlags = D3D11_BIND_DEPTH_STENCIL,
   };
 
   ID3D11Texture2D *texture = nullptr;
@@ -115,9 +115,9 @@ inline void DX11_SetRenderTargets_(DX11_GPU gpu,
                               renderTargetViews.ptr, depthTarget.view);
 
   D3D11_VIEWPORT viewport = {
-      .Width = static_cast<f32>(size.width),
-      .Height = static_cast<f32>(size.height),
-      .MaxDepth = 1,
+    .Width = static_cast<f32>(size.width),
+    .Height = static_cast<f32>(size.height),
+    .MaxDepth = 1,
   };
   context->RSSetViewports(1, &viewport);
 }
@@ -146,8 +146,8 @@ inline void DX11_SetRenderTargets(DX11_GPU gpu,
   }
 
   Vector2<u32> size = renderTargets.count > 0
-                          ? DX11_GetRenderTargetSize(renderTargets[0])
-                          : DX11_GetDepthTargetSize(depthTarget);
+                        ? DX11_GetRenderTargetSize(renderTargets[0])
+                        : DX11_GetDepthTargetSize(depthTarget);
   DX11_SetRenderTargets_(gpu, {renderTargetViews, renderTargets.count}, depthTarget, size);
 }
 
