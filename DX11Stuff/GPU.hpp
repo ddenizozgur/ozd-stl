@@ -77,7 +77,6 @@ inline HRESULT DX11_CreateDeviceAndImmediateContext_(IDXGIAdapter1 *adapter, UIN
                                      &featureLevel, 1, D3D11_SDK_VERSION, device, nullptr, context);
   if (FAILED(result) && (createFlags & D3D11_CREATE_DEVICE_DEBUG))
   {
-    // the debug layer needs the 'Graphics Tools' optional Windows feature
     fprintf(stderr, "creating the D3D11 device with the debug layer failed, retrying without it\n");
     createFlags &= ~D3D11_CREATE_DEVICE_DEBUG;
     result = D3D11CreateDevice(adapter, D3D_DRIVER_TYPE_UNKNOWN, nullptr, createFlags,

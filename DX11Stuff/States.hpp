@@ -1,8 +1,6 @@
 #pragma once
 
 #include "GPU.hpp"
-
-// Presets to pass to the DX11_Create*State functions, or to copy and tweak first.
 // D3D11 returns the same object for identical descs, so creating a preset twice is cheap.
 
 //
@@ -21,7 +19,7 @@ inline constexpr D3D11_BLEND_DESC DX11_BLEND_DESC_OPAQUE = {
     }},
 };
 
-// color * alpha + destination * (1 - alpha), for colors that aren't multiplied by alpha yet
+// color * alpha + destination * (1 - alpha)
 inline constexpr D3D11_BLEND_DESC DX11_BLEND_DESC_ALPHA = {
     .RenderTarget = {{
         .BlendEnable = true,
@@ -35,7 +33,7 @@ inline constexpr D3D11_BLEND_DESC DX11_BLEND_DESC_ALPHA = {
     }},
 };
 
-// color + destination * (1 - alpha), for colors already multiplied by alpha
+// color + destination * (1 - alpha)
 inline constexpr D3D11_BLEND_DESC DX11_BLEND_DESC_PREMULTIPLIED_ALPHA = {
     .RenderTarget = {{
         .BlendEnable = true,
@@ -49,7 +47,7 @@ inline constexpr D3D11_BLEND_DESC DX11_BLEND_DESC_PREMULTIPLIED_ALPHA = {
     }},
 };
 
-// color + destination, e.g. for lights and glows
+// color + destination
 inline constexpr D3D11_BLEND_DESC DX11_BLEND_DESC_ADDITIVE = {
     .RenderTarget = {{
         .BlendEnable = true,
@@ -65,7 +63,8 @@ inline constexpr D3D11_BLEND_DESC DX11_BLEND_DESC_ADDITIVE = {
 
 // nullptr when the desc is invalid
 [[nodiscard]]
-inline ID3D11BlendState *DX11_CreateBlendState(DX11_GPU gpu, const D3D11_BLEND_DESC &desc)
+inline ID3D11BlendState *
+DX11_CreateBlendState(DX11_GPU gpu, const D3D11_BLEND_DESC &desc)
 {
   ID3D11BlendState *state = nullptr;
   gpu.device1->CreateBlendState(&desc, &state);
@@ -75,6 +74,7 @@ inline ID3D11BlendState *DX11_CreateBlendState(DX11_GPU gpu, const D3D11_BLEND_D
 //
 // Rasterizer
 //
+
 // clockwise triangles are the front faces
 inline constexpr D3D11_RASTERIZER_DESC DX11_RASTERIZER_DESC_CULL_BACK = {
     .FillMode = D3D11_FILL_SOLID,
@@ -82,7 +82,7 @@ inline constexpr D3D11_RASTERIZER_DESC DX11_RASTERIZER_DESC_CULL_BACK = {
     .DepthClipEnable = true,
 };
 
-// draws both sides, triangle order doesn't matter
+// draws both sides
 inline constexpr D3D11_RASTERIZER_DESC DX11_RASTERIZER_DESC_NO_CULL = {
     .FillMode = D3D11_FILL_SOLID,
     .CullMode = D3D11_CULL_NONE,
@@ -97,7 +97,8 @@ inline constexpr D3D11_RASTERIZER_DESC DX11_RASTERIZER_DESC_WIREFRAME = {
 
 // nullptr when the desc is invalid
 [[nodiscard]]
-inline ID3D11RasterizerState *DX11_CreateRasterizerState(DX11_GPU gpu, const D3D11_RASTERIZER_DESC &desc)
+inline ID3D11RasterizerState *
+DX11_CreateRasterizerState(DX11_GPU gpu, const D3D11_RASTERIZER_DESC &desc)
 {
   ID3D11RasterizerState *state = nullptr;
   gpu.device1->CreateRasterizerState(&desc, &state);
@@ -114,7 +115,7 @@ inline constexpr D3D11_DEPTH_STENCILOP_DESC DX11_STENCIL_OP_DESC_KEEP_ = {
     .StencilFunc = D3D11_COMPARISON_ALWAYS,
 };
 
-// no depth test or write, draw order decides, e.g. 2D and UI
+// no depth test or write
 inline constexpr D3D11_DEPTH_STENCIL_DESC DX11_DEPTH_DESC_OFF = {
     .DepthEnable = false,
     .DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO,
@@ -132,7 +133,7 @@ inline constexpr D3D11_DEPTH_STENCIL_DESC DX11_DEPTH_DESC_LESS = {
     .BackFace = DX11_STENCIL_OP_DESC_KEEP_,
 };
 
-// tests against depth without writing it, e.g. transparent objects after the opaque ones
+// tests against depth without writing it
 inline constexpr D3D11_DEPTH_STENCIL_DESC DX11_DEPTH_DESC_READ_ONLY = {
     .DepthEnable = true,
     .DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO,
@@ -153,8 +154,7 @@ inline ID3D11DepthStencilState *DX11_CreateDepthState(DX11_GPU gpu, const D3D11_
 //
 // Sampler
 //
-// point keeps pixels sharp, e.g. pixel art and fonts; linear blends neighbors.
-// clamp repeats the edge pixels outside 0..1, wrap tiles the texture.
+
 inline constexpr D3D11_SAMPLER_DESC DX11_SAMPLER_DESC_POINT_CLAMP = {
     .Filter = D3D11_FILTER_MIN_MAG_MIP_POINT,
     .AddressU = D3D11_TEXTURE_ADDRESS_CLAMP,
@@ -197,7 +197,8 @@ inline constexpr D3D11_SAMPLER_DESC DX11_SAMPLER_DESC_LINEAR_WRAP = {
 
 // nullptr when the desc is invalid
 [[nodiscard]]
-inline ID3D11SamplerState *DX11_CreateSamplerState(DX11_GPU gpu, const D3D11_SAMPLER_DESC &desc)
+inline ID3D11SamplerState *
+DX11_CreateSamplerState(DX11_GPU gpu, const D3D11_SAMPLER_DESC &desc)
 {
   ID3D11SamplerState *state = nullptr;
   gpu.device1->CreateSamplerState(&desc, &state);
