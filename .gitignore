@@ -1,5 +1,6 @@
 .vscode
-Build/
+Bin/
 *.exe
 *.pdb
 zFindings/
+.clang-format

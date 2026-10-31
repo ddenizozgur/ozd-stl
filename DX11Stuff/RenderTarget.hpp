@@ -66,8 +66,6 @@ inline void DX11_ReleaseRenderTarget(DX11_Render_Target *target)
 //
 // Depth Target
 //
-
-// format: DXGI_FORMAT_D32_FLOAT, D24_UNORM_S8_UINT to also have a stencil, or D16_UNORM to save memory
 [[nodiscard]]
 inline Pair<DX11_Depth_Target, bool>
 DX11_CreateDepthTarget(DX11_GPU gpu, Vector2<u32> size, DXGI_FORMAT format = DXGI_FORMAT_D32_FLOAT)
@@ -106,11 +104,11 @@ inline void DX11_ReleaseDepthTarget(DX11_Depth_Target *target)
 }
 
 //
-// Render Pass
+// Binding
 //
-inline void DX11_SetRenderPass_(DX11_GPU gpu,
-                                Slice<ID3D11RenderTargetView *> renderTargetViews,
-                                DX11_Depth_Target depthTarget, Vector2<u32> size)
+inline void DX11_SetRenderTargets_(DX11_GPU gpu,
+                                   Slice<ID3D11RenderTargetView *> renderTargetViews,
+                                   DX11_Depth_Target depthTarget, Vector2<u32> size)
 {
   auto context = gpu.immediateContext1;
   context->OMSetRenderTargets(static_cast<UINT>(renderTargetViews.count),
@@ -124,18 +122,19 @@ inline void DX11_SetRenderPass_(DX11_GPU gpu,
   context->RSSetViewports(1, &viewport);
 }
 
-inline void DX11_SetBackbufferRenderPass(DX11_GPU gpu,
-                                         DX11_Swapchain swapchain,
-                                         DX11_Depth_Target depthTarget = {})
+// also sets the viewport to the backbuffer's size
+inline void DX11_SetBackbufferAsRenderTarget(DX11_GPU gpu,
+                                             DX11_Swapchain swapchain,
+                                             DX11_Depth_Target depthTarget = {})
 {
   auto size = DX11_GetSwapchainSize(swapchain);
-  DX11_SetRenderPass_(gpu, {&swapchain.backbufferView, 1}, depthTarget, size);
+  DX11_SetRenderTargets_(gpu, {&swapchain.backbufferView, 1}, depthTarget, size);
 }
 
-// all must be the same size as each other and as depth.
-inline void DX11_SetRenderPass(DX11_GPU gpu,
-                               Slice<DX11_Render_Target> renderTargets,
-                               DX11_Depth_Target depthTarget = {})
+// all must be the same size as each other and as depth. also sets the viewport to their size
+inline void DX11_SetRenderTargets(DX11_GPU gpu,
+                                  Slice<DX11_Render_Target> renderTargets,
+                                  DX11_Depth_Target depthTarget = {})
 {
   assert(renderTargets.count <= D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT &&
          "D3D11 binds at most 8 render targets");
@@ -149,7 +148,7 @@ inline void DX11_SetRenderPass(DX11_GPU gpu,
   Vector2<u32> size = renderTargets.count > 0
                           ? DX11_GetRenderTargetSize(renderTargets[0])
                           : DX11_GetDepthTargetSize(depthTarget);
-  DX11_SetRenderPass_(gpu, {renderTargetViews, renderTargets.count}, depthTarget, size);
+  DX11_SetRenderTargets_(gpu, {renderTargetViews, renderTargets.count}, depthTarget, size);
 }
 
 //

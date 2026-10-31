@@ -67,7 +67,7 @@ Win32_WaitAny(Slice<Win32_Waitable> waitables, u32 timeoutMs = INFINITE, Wait_Fl
 {
   assert(waitables.count <= MAXIMUM_WAIT_OBJECTS && "Windows waits on at most 64 handles");
 
-  DWORD count = waitables.count;
+  auto count = static_cast<DWORD>(waitables.count);
   auto handles = reinterpret_cast<const HANDLE *>(waitables.ptr);
   bool alertable = flags & Wait_Flag_RunQueuedCallbacks;
   DWORD result = WaitForMultipleObjectsEx(count, handles, false, timeoutMs, alertable);
@@ -82,7 +82,7 @@ Win32_WaitAnyOrWindowMessages(Slice<Win32_Waitable> waitables, u32 timeoutMs = I
 {
   assert(waitables.count < MAXIMUM_WAIT_OBJECTS && "Windows waits on at most 63 handles plus window messages");
 
-  DWORD count = waitables.count;
+  auto count = static_cast<DWORD>(waitables.count);
   auto handles = reinterpret_cast<const HANDLE *>(waitables.ptr);
   DWORD waitFlags = MWMO_INPUTAVAILABLE;
   if (flags & Wait_Flag_RunQueuedCallbacks)

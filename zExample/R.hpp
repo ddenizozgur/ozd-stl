@@ -242,7 +242,7 @@ inline void R_PutStringAscii(R_FrameBuffer *frameBuffer, R_BitmapFont font,
     {
       // moves at least one glyph, so a tab right at a stop goes to the next one
       usize offset = cursor.x - position.x + font.glyphSize.width;
-      cursor.x = position.x + AlignForward(offset, tabStopWidth);
+      cursor.x = position.x + static_cast<i32>(AlignForward(offset, tabStopWidth));
     }
     else
     {
@@ -274,7 +274,7 @@ inline Vector2<i32> R_MeasureStringAscii(R_BitmapFont font, String text)
     else if (c == '\t')
     {
       usize offset = lineWidth + font.glyphSize.width;
-      lineWidth = AlignForward(offset, tabStopWidth);
+      lineWidth = static_cast<i32>(AlignForward(offset, tabStopWidth));
     }
     else
     {

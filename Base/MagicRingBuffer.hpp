@@ -1,8 +1,10 @@
 #pragma once
 
-#include "Virtual.hpp"
-
+//
 // requires Windows 10 version 1803.
+//
+
+#include "Virtual.hpp"
 
 // the "magic ring buffer", by Fabian Giesen:
 // https://fgiesen.wordpress.com/2012/07/21/the-magic-ring-buffer/

@@ -102,7 +102,7 @@ inline usize Win32_FileReadToBuffer(Win32_File file, usize offset, Slice<u8> buf
     overlapped.Offset = static_cast<DWORD>(position);
     overlapped.OffsetHigh = static_cast<DWORD>(position >> 32);
 
-    DWORD chunk = Minimum(buffer.count - total, WIN32_FILE_IO_CHUNK_SIZE);
+    auto chunk = static_cast<DWORD>(Minimum(buffer.count - total, WIN32_FILE_IO_CHUNK_SIZE));
     DWORD read = 0;
     if (!ReadFile(file.handle, buffer.ptr + total, chunk, &read, &overlapped) || read == 0)
     {
@@ -143,7 +143,7 @@ inline usize Win32_FileWrite(Win32_File file, usize offset, Slice<u8> data)
     overlapped.Offset = static_cast<DWORD>(position);
     overlapped.OffsetHigh = static_cast<DWORD>(position >> 32);
 
-    DWORD chunk = Minimum(data.count - total, WIN32_FILE_IO_CHUNK_SIZE);
+    auto chunk = static_cast<DWORD>(Minimum(data.count - total, WIN32_FILE_IO_CHUNK_SIZE));
     DWORD written = 0;
     if (!WriteFile(file.handle, data.ptr + total, chunk, &written, &overlapped) || written == 0)
     {
@@ -268,7 +268,7 @@ inline Pair<usize, bool> Win32_PipeReadBlocking(Win32_Pipe_Reader reader, Slice<
 {
   assert(reader.handle != nullptr && "pipe reader isn't open");
 
-  DWORD chunk = Minimum(buffer.count, WIN32_FILE_IO_CHUNK_SIZE);
+  auto chunk = static_cast<DWORD>(Minimum(buffer.count, WIN32_FILE_IO_CHUNK_SIZE));
   DWORD bytesRead = 0;
   bool open = ReadFile(reader.handle, buffer.ptr, chunk, &bytesRead, nullptr);
   return {bytesRead, open};
@@ -295,7 +295,7 @@ inline Pair<usize, bool> Win32_PipeWriteBlocking(Win32_Pipe_Writer writer, Slice
   bool open = true;
   for (; open && total < data.count;)
   {
-    DWORD chunk = Minimum(data.count - total, WIN32_FILE_IO_CHUNK_SIZE);
+    auto chunk = static_cast<DWORD>(Minimum(data.count - total, WIN32_FILE_IO_CHUNK_SIZE));
     DWORD bytesWritten = 0;
     open = WriteFile(writer.handle, data.ptr + total, chunk, &bytesWritten, nullptr);
     // NOTE: do this for non-blocking pipes

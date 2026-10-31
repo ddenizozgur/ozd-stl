@@ -1,12 +1,16 @@
 #include "../Base/File.hpp"
 #include "../Base/Math.hpp"
 #include "../Base/Time.hpp"
-#include "../Win32Stuff/Theme.hpp"
-#include "../Win32Stuff/WindowRelated.hpp"
 #include "../DX11Stuff/Buffers.hpp"
+#include "../DX11Stuff/Presets.hpp"
 #include "../DX11Stuff/RenderTarget.hpp"
 #include "../DX11Stuff/Shader.hpp"
 #include "../DX11Stuff/Swapchain.hpp"
+#include "../DX11Stuff/Texture.hpp"
+#include "../Win32Stuff/Com.hpp"
+#include "../Win32Stuff/Image.hpp"
+#include "../Win32Stuff/Theme.hpp"
+#include "../Win32Stuff/WindowRelated.hpp"
 
 struct Example_Globals
 {
@@ -39,56 +43,49 @@ void UpdateTitle(HWND hWnd, f32 frameTime)
   frameCounter += 1;
 }
 
-struct Vertex
-{
-  f32 position[2];
-  f32 color[4];
-};
-
 struct alignas(16) Frame
 {
   f32 aspect;
+  f32 imageAspect;
   f32 time;
 };
-
-inline constexpr u32 INSTANCE_COUNT = 32;
 
 inline auto WIN32_NON_UNICODE_CURSOR_ARROW = MAKEINTRESOURCEA(32512);
 
 int main()
 {
-  HINSTANCE hInstance = GetModuleHandleW(nullptr);
+  auto com = Win32_InitComOnThread(Com_Apartment_SingleThreaded);
+  Defer(Win32_UninitComOnThread(&com););
 
+  HINSTANCE hInstance = GetModuleHandleW(nullptr);
   WNDCLASSW wndClass = {
-      .lpfnWndProc = ExampleWndProc,
-      .hInstance = hInstance,
-      .hCursor = LoadCursorA(nullptr, WIN32_NON_UNICODE_CURSOR_ARROW),
-      .lpszClassName = L"DX11ExampleClass",
+    .lpfnWndProc = ExampleWndProc,
+    .hInstance = hInstance,
+    .hCursor = LoadCursorA(nullptr, WIN32_NON_UNICODE_CURSOR_ARROW),
+    .lpszClassName = L"DX11ExampleClass",
   };
   RegisterClassW(&wndClass);
 
   DWORD dwStyle = WS_OVERLAPPEDWINDOW;
-  DWORD dwExStyle = WS_EX_NOREDIRECTIONBITMAP; // flip model swapchains don't need GDI's copy of the window
-
-  RECT wndRect = {0, 0, 1600, 900};
+  DWORD dwExStyle = WS_EX_NOREDIRECTIONBITMAP;
+  RECT wndRect = {0, 0, 1280, 720};
   AdjustWindowRectEx(&wndRect, dwStyle, false, dwExStyle);
-
   auto hWnd = CreateWindowExW(dwExStyle, wndClass.lpszClassName, L"DX11Example", dwStyle,
                               CW_USEDEFAULT, CW_USEDEFAULT,
                               wndRect.right - wndRect.left, wndRect.bottom - wndRect.top,
                               nullptr, nullptr, hInstance, nullptr);
-  Win32_SetDarkTheme(hWnd, Window_Backdrop_None);
+  Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic);
 
   auto factory6 = DX11_CreateFactory6();
   Defer(Win32_ComSafeRelease(&factory6););
 
   auto [gpu, gpuOk] = DX11_CreateGPU(factory6);
-  auto [swapchain, swapchainOk] = DX11_CreateSwapchain(factory6, gpu, hWnd);
+  auto [swapchain, swapchainOk] = DX11_CreateSwapchain(factory6, gpu, hWnd, DX11_Swapchain_Flag_Srgb);
   Defer(DX11_ReleaseGPU(&gpu);
         DX11_ReleaseSwapchain(&swapchain););
 
   auto arena = ArenaInit();
-  String shaderPath = Win32_PathFromExe(&arena, StringLit("../Shaders/Triangle.hlsl"));
+  String shaderPath = Win32_PathFromExe(&arena, StringLit("../Shaders/Textured.hlsl"));
   auto [vsBytes, vsOk] = DX11_CompileShaderFromFile(&arena, shaderPath, "VSMain", DX11_VERTEX_SHADER_TARGET);
   auto [psBytes, psOk] = DX11_CompileShaderFromFile(&arena, shaderPath, "PSMain", DX11_PIXEL_SHADER_TARGET);
   auto vertexShader = DX11_CreateVertexShader(gpu, vsBytes);
@@ -96,20 +93,24 @@ int main()
   Defer(Win32_ComSafeRelease(&vertexShader);
         Win32_ComSafeRelease(&pixelShader););
 
-  Vertex triangle[] = {
-      {{0.0f, 1.0f}, {1, 0.2f, 0.2f, 1}},
-      {{0.87f, -0.5f}, {0.2f, 1, 0.2f, 1}},
-      {{-0.87f, -0.5f}, {0.2f, 0.4f, 1, 1}},
-  };
-  auto [vertices, verticesOk] = DX11_CreateStorageBuffer(gpu, SliceAsBytes(SliceFromArray(triangle)), sizeof(Vertex));
-  auto [offsets, offsetsOk] = DX11_CreateTransientBuffer(gpu, INSTANCE_COUNT, sizeof(Vector2<f32>));
+  String imagePath = Win32_PathFromExe(&arena, StringLit("../Assets/Pattern.png"));
+  auto [fileBytes, fileOk] = Win32_ReadEntireFile(&arena, imagePath);
+  auto [image, imageOk] = Win32_DecodeImageAs(&arena, fileBytes, Image_Format_RGBA8Premultiplied);
+  DXGI_FORMAT textureFormat = DX11_TextureFormatFromImage(image.format, true);
+  auto [texture, textureOk] = DX11_CreateTexture2D(gpu, image.size, textureFormat, image.pixels, true);
+  Defer(DX11_ReleaseTexture2D(&texture););
+
+  auto sampler = DX11_CreateSamplerState(gpu, DX11_SAMPLER_DESC_LINEAR_WRAP);
+  auto blend = DX11_CreateBlendState(gpu, DX11_BLEND_DESC_PREMULTIPLIED_ALPHA);
   auto [constants, constantsOk] = DX11_CreateConstantBuffer(gpu, sizeof(Frame));
-  Defer(DX11_ReleaseStorageBuffer(&vertices);
-        DX11_ReleaseTransientBuffer(&offsets);
+  Defer(Win32_ComSafeRelease(&sampler);
+        Win32_ComSafeRelease(&blend);
         DX11_ReleaseConstantBuffer(&constants););
 
-  ShowWindow(hWnd, SW_SHOW);
+  Vector2<u32> textureSize = DX11_GetTexture2DSize(texture);
+  f32 imageAspect = static_cast<f32>(textureSize.width) / textureSize.height;
 
+  ShowWindow(hWnd, SW_SHOW);
   auto timeStart = Win32_NowNanoseconds();
   auto timeLast = timeStart;
 
@@ -125,42 +126,34 @@ int main()
     DX11_ResizeSwapchain(gpu, &swapchain, g.clientSize);
 
     auto timeNow = Win32_NowNanoseconds();
-    f32 frameTime = SecondsFromNano(timeNow - timeLast);
-    f32 time = SecondsFromNano(timeNow - timeStart);
+    auto frameTime = static_cast<f32>(SecondsFromNano(timeNow - timeLast));
+    auto time = static_cast<f32>(SecondsFromNano(timeNow - timeStart));
     timeLast = timeNow;
     UpdateTitle(hWnd, frameTime);
 
     Vector2<u32> swapchainSize = DX11_GetSwapchainSize(swapchain);
     {
       Frame frame = {
-          .aspect = static_cast<f32>(swapchainSize.width) / swapchainSize.height,
-          .time = time,
+        .aspect = static_cast<f32>(swapchainSize.width) / swapchainSize.height,
+        .imageAspect = imageAspect,
+        .time = time,
       };
       DX11_UpdateConstantBuffer(gpu, constants, SliceAsBytes(Slice<Frame>{&frame, 1}));
     }
 
     {
-      Vector2<f32> instanceOffsets[INSTANCE_COUNT];
-      for (u32 i = 0; i < INSTANCE_COUNT; i += 1)
-      {
-        f32 angle = time * 0.5f + i * (6.2831853f / INSTANCE_COUNT);
-        instanceOffsets[i] = {0.6f * cosf(angle), 0.6f * sinf(angle)};
-      }
-      DX11_UpdateTransientBuffer(gpu, offsets, SliceAsBytes(SliceFromArray(instanceOffsets)));
-    }
-
-    {
-      DX11_ClearBackbuffer(gpu, swapchain, {0.1f, 0.2f, 0.3f, 1});
-      DX11_SetBackbufferRenderPass(gpu, swapchain);
+      DX11_ClearBackbuffer(gpu, swapchain, {0.05f, 0.05f, 0.08f, 1});
+      DX11_SetBackbufferAsRenderTarget(gpu, swapchain);
 
       auto context = gpu.immediateContext1;
       context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
       context->VSSetShader(vertexShader, nullptr, 0);
-      context->PSSetShader(pixelShader, nullptr, 0);
-      ID3D11ShaderResourceView *views[] = {vertices.view, offsets.view};
-      context->VSSetShaderResources(0, 2, views);
       context->VSSetConstantBuffers(0, 1, &constants.buffer);
-      context->DrawInstanced(DX11_GetStorageBufferElementCount(vertices), INSTANCE_COUNT, 0, 0);
+      context->PSSetShader(pixelShader, nullptr, 0);
+      context->PSSetShaderResources(0, 1, &texture.view);
+      context->PSSetSamplers(0, 1, &sampler);
+      context->OMSetBlendState(blend, nullptr, 0xFFFFFFFF);
+      context->Draw(6, 0);
     }
 
     DX11_PresentSwapchain(swapchain, 0);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../Base/Core.hpp"
+#include "../Win32Stuff/Com.hpp"
 #include <stdio.h>
 
 #define WIN32_LEAN_AND_MEAN
@@ -11,16 +12,6 @@
 #pragma comment(lib, "d3d11")
 #pragma comment(lib, "dxgi")
 #pragma comment(lib, "dxguid")
-
-template <typename T>
-inline void Win32_ComSafeRelease(T **object)
-{
-  if (*object != nullptr)
-  {
-    (*object)->Release();
-  }
-  *object = nullptr;
-}
 
 // IDXGIFactory6 requires Windows 10 1803.
 [[nodiscard]]

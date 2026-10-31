@@ -61,7 +61,6 @@ inline constexpr D3D11_BLEND_DESC DX11_BLEND_DESC_ADDITIVE = {
     }},
 };
 
-// nullptr when the desc is invalid
 [[nodiscard]]
 inline ID3D11BlendState *
 DX11_CreateBlendState(DX11_GPU gpu, const D3D11_BLEND_DESC &desc)
@@ -95,7 +94,6 @@ inline constexpr D3D11_RASTERIZER_DESC DX11_RASTERIZER_DESC_WIREFRAME = {
     .DepthClipEnable = true,
 };
 
-// nullptr when the desc is invalid
 [[nodiscard]]
 inline ID3D11RasterizerState *
 DX11_CreateRasterizerState(DX11_GPU gpu, const D3D11_RASTERIZER_DESC &desc)
@@ -142,9 +140,9 @@ inline constexpr D3D11_DEPTH_STENCIL_DESC DX11_DEPTH_DESC_READ_ONLY = {
     .BackFace = DX11_STENCIL_OP_DESC_KEEP_,
 };
 
-// nullptr when the desc is invalid
 [[nodiscard]]
-inline ID3D11DepthStencilState *DX11_CreateDepthState(DX11_GPU gpu, const D3D11_DEPTH_STENCIL_DESC &desc)
+inline ID3D11DepthStencilState *
+DX11_CreateDepthState(DX11_GPU gpu, const D3D11_DEPTH_STENCIL_DESC &desc)
 {
   ID3D11DepthStencilState *state = nullptr;
   gpu.device1->CreateDepthStencilState(&desc, &state);
@@ -154,7 +152,6 @@ inline ID3D11DepthStencilState *DX11_CreateDepthState(DX11_GPU gpu, const D3D11_
 //
 // Sampler
 //
-
 inline constexpr D3D11_SAMPLER_DESC DX11_SAMPLER_DESC_POINT_CLAMP = {
     .Filter = D3D11_FILTER_MIN_MAG_MIP_POINT,
     .AddressU = D3D11_TEXTURE_ADDRESS_CLAMP,
@@ -195,7 +192,6 @@ inline constexpr D3D11_SAMPLER_DESC DX11_SAMPLER_DESC_LINEAR_WRAP = {
     .MaxLOD = D3D11_FLOAT32_MAX,
 };
 
-// nullptr when the desc is invalid
 [[nodiscard]]
 inline ID3D11SamplerState *
 DX11_CreateSamplerState(DX11_GPU gpu, const D3D11_SAMPLER_DESC &desc)
