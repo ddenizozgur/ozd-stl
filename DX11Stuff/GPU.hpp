@@ -90,8 +90,7 @@ enum : DX11_Device_Flags
 {
   DX11_Device_Flag_None = 0,
   DX11_Device_Flag_Debug = 1 << 0,
-  DX11_Device_Flag_SingleThreaded = 1 << 1,
-  DX11_Device_Flag_ForceWarp = 1 << 2, // software renderer
+  DX11_Device_Flag_ForceWarp = 1 << 1, // software renderer
 #if IS_DEBUG
   DX11_Device_Flags_Default = DX11_Device_Flag_Debug,
 #else
@@ -116,10 +115,6 @@ DX11_CreateGPU(IDXGIFactory6 *factory,
   if (flags & DX11_Device_Flag_Debug)
   {
     createFlags |= D3D11_CREATE_DEVICE_DEBUG;
-  }
-  if (flags & DX11_Device_Flag_SingleThreaded)
-  {
-    createFlags |= D3D11_CREATE_DEVICE_SINGLETHREADED;
   }
 
   ID3D11Device *baseDevice = nullptr;

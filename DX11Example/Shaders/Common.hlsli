@@ -6,6 +6,6 @@ struct Vertex
 
 cbuffer Frame : register(b0)
 {
-  float aspect; // width / height
-  float time;   // seconds
+  float aspect;
+  float time;
 };

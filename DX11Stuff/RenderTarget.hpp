@@ -2,6 +2,7 @@
 
 #include "../Base/Math.hpp"
 #include "Swapchain.hpp"
+#include "Texture.hpp"
 
 struct DX11_Render_Target
 {
@@ -13,18 +14,6 @@ struct DX11_Depth_Target
 {
   ID3D11DepthStencilView *view;
 };
-
-[[nodiscard]]
-inline Vector2<u32> DX11_GetTextureSize_(ID3D11View *view)
-{
-  ID3D11Resource *resource = nullptr;
-  view->GetResource(&resource);
-  Defer(resource->Release(););
-
-  D3D11_TEXTURE2D_DESC desc = {};
-  static_cast<ID3D11Texture2D *>(resource)->GetDesc(&desc);
-  return {desc.Width, desc.Height};
-}
 
 //
 // Render Target
@@ -77,6 +66,7 @@ inline void DX11_ReleaseRenderTarget(DX11_Render_Target *target)
 //
 // Depth Target
 //
+
 // format: DXGI_FORMAT_D32_FLOAT, D24_UNORM_S8_UINT to also have a stencil, or D16_UNORM to save memory
 [[nodiscard]]
 inline Pair<DX11_Depth_Target, bool>

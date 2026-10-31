@@ -1,7 +1,7 @@
 #include "Common.hlsli"
 
 StructuredBuffer<Vertex> vertices : register(t0);
-StructuredBuffer<float2> offsets : register(t1); // one per instance
+StructuredBuffer<float2> offsets : register(t1);
 
 struct Pixel
 {
