@@ -29,7 +29,6 @@ inline Win32_Com_Thread Win32_InitComOnThread(Com_Apartment apartment)
   {
     fprintf(stderr, "Win32_InitComOnThread: the thread is already in the other COM apartment, using that one\n");
   }
-  // S_FALSE (already initialized in the same apartment) also needs an uninitialize
   return {.needsUninitialize = SUCCEEDED(result)};
 }
 

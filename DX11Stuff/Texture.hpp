@@ -25,10 +25,10 @@ inline Vector2<u32> DX11_GetTextureSize_(ID3D11View *view)
 // pixels are tightly packed rows for uncompressed format
 [[nodiscard]]
 inline Pair<DX11_Texture2D, bool>
-DX11_CreateTexture2D(DX11_GPU gpu, Vector2<u32> size, DXGI_FORMAT format, Slice<u8> pixels, bool generateMips = false)
+DX11_CreateTexture2D(DX11_GPU gpu, Slice<u8> pixels, Vector2<u32> size, DXGI_FORMAT format, bool generateMips = false)
 {
   usize pixelCount = static_cast<usize>(size.width) * size.height;
-  assert(pixelCount != 0 && pixels.count % pixelCount == 0 && "pixels don't match the size");
+  assert(pixelCount != 0 && pixels.count % pixelCount == 0 && "pixels don't match with size");
 
   auto rowPitch = static_cast<UINT>(pixels.count / pixelCount * size.width);
   D3D11_TEXTURE2D_DESC desc = {
@@ -78,8 +78,6 @@ inline Vector2<u32> DX11_GetTexture2DSize(DX11_Texture2D texture)
   return DX11_GetTextureSize_(texture.view);
 }
 
-// generally srgb applied for color data such as albedo.
-// generally false for data such as normal maps and masks
 [[nodiscard]]
 inline DXGI_FORMAT DX11_TextureFormatFromImage(Image_Format format, bool srgb)
 {

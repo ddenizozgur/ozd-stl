@@ -99,7 +99,7 @@ int main()
   auto [fileBytes, fileOk] = Win32_ReadEntireFile(&arena, imagePath);
   auto [image, imageOk] = Win32_WicDecodeImageAs(&arena, fileBytes, Image_Format_RGBA8Premultiplied);
   DXGI_FORMAT textureFormat = DX11_TextureFormatFromImage(image.format, true);
-  auto [texture, textureOk] = DX11_CreateTexture2D(gpu, image.size, textureFormat, image.pixels, true);
+  auto [texture, textureOk] = DX11_CreateTexture2D(gpu, image.pixels, image.size, textureFormat, true);
   Defer(DX11_ReleaseTexture2D(&texture););
 
   auto sampler = DX11_CreateSamplerState(gpu, DX11_SAMPLER_DESC_LINEAR_WRAP);
@@ -118,20 +118,19 @@ int main()
 
   for (; !g.shouldClose;)
   {
-    DX11_WaitForBetterLatency(swapchain);
+    auto timeNow = Win32_NowNanoseconds();
+    auto frameTime = static_cast<f32>(SecondsFromNano(timeNow - timeLast));
+    auto time = static_cast<f32>(SecondsFromNano(timeNow - timeStart));
+    timeLast = timeNow;
+    UpdateTitle(hWnd, frameTime);
 
+    DX11_WaitForBetterLatency(swapchain); // call it before handling input
     for (MSG message; PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE);)
     {
       TranslateMessage(&message);
       DispatchMessageW(&message);
     }
     DX11_ResizeSwapchain(gpu, &swapchain, g.clientSize);
-
-    auto timeNow = Win32_NowNanoseconds();
-    auto frameTime = static_cast<f32>(SecondsFromNano(timeNow - timeLast));
-    auto time = static_cast<f32>(SecondsFromNano(timeNow - timeStart));
-    timeLast = timeNow;
-    UpdateTitle(hWnd, frameTime);
 
     Vector2<u32> swapchainSize = DX11_GetSwapchainSize(swapchain);
     {
@@ -159,6 +158,7 @@ int main()
     }
 
     DX11_PresentSwapchain(swapchain, 0);
+    DX11_FlushInfoQueue(gpu);
   }
 }
 

@@ -25,8 +25,11 @@ inline IDXGIFactory6 *DX11_CreateFactory6(bool debug = IS_DEBUG)
     if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&infoQueue))))
     {
       flags = DXGI_CREATE_FACTORY_DEBUG;
-      infoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
-      infoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
+      if (IsDebuggerPresent())
+      {
+        infoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
+        infoQueue->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
+      }
       infoQueue->Release();
     }
     else
@@ -95,6 +98,7 @@ struct DX11_GPU
   ID3D11Device1 *device1;
   ID3D11DeviceContext1 *immediateContext1;
   IDXGIAdapter1 *adapter1;
+  IDXGIInfoQueue *dxgiInfoQueue; // only with a debug device, holds the D3D11 and DXGI messages
 };
 
 [[nodiscard]]
@@ -140,16 +144,22 @@ DX11_CreateGPU(IDXGIFactory6 *factory,
   baseDevice->QueryInterface(IID_PPV_ARGS(&device1));
   baseImmediateContext->QueryInterface(IID_PPV_ARGS(&immediateContext1));
 
+  // requires 'Graphics Tools'
+  IDXGIInfoQueue *dxgiInfoQueue = nullptr;
   if (device1->GetCreationFlags() & D3D11_CREATE_DEVICE_DEBUG)
   {
-    ID3D11InfoQueue *infoQueue = nullptr;
-    device1->QueryInterface(IID_PPV_ARGS(&infoQueue));
-    infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, true);
-    infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, true);
-    infoQueue->Release();
+    DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiInfoQueue));
+    if (IsDebuggerPresent())
+    {
+      ID3D11InfoQueue *infoQueue = nullptr;
+      device1->QueryInterface(IID_PPV_ARGS(&infoQueue));
+      infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, true);
+      infoQueue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, true);
+      infoQueue->Release();
+    }
   }
 
-  return {{device1, immediateContext1, adapter1}, true};
+  return {{device1, immediateContext1, adapter1, dxgiInfoQueue}, true};
 }
 
 // name, vendor/device IDs, video memory sizes, flags
@@ -180,9 +190,57 @@ inline void DX11_ReleaseGPU(DX11_GPU *gpu)
   Win32_ComSafeRelease(&gpu->immediateContext1);
   Win32_ComSafeRelease(&gpu->device1);
   Win32_ComSafeRelease(&gpu->adapter1);
+  Win32_ComSafeRelease(&gpu->dxgiInfoQueue);
 }
 
-// Needs the 'Graphics Tools' optional Windows feature.
+[[nodiscard]]
+inline const char *
+DX11_InfoQueueSeverityName_(DXGI_INFO_QUEUE_MESSAGE_SEVERITY severity)
+{
+  switch (severity)
+  {
+  case DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION:
+    return "CORRUPTION";
+  case DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR:
+    return "ERROR";
+  case DXGI_INFO_QUEUE_MESSAGE_SEVERITY_WARNING:
+    return "WARNING";
+  case DXGI_INFO_QUEUE_MESSAGE_SEVERITY_INFO:
+    return "INFO";
+  default:
+    return "MESSAGE";
+  }
+}
+
+// prints the stored messages to stderr
+inline void DX11_FlushInfoQueue_(IDXGIInfoQueue *queue)
+{
+  UINT64 count = queue->GetNumStoredMessagesAllowedByRetrievalFilters(DXGI_DEBUG_ALL);
+  for (UINT64 i = 0; i < count; i += 1)
+  {
+    auto scratch = ScratchBegin();
+    Defer(ScratchEnd(scratch););
+
+    SIZE_T size = 0;
+    queue->GetMessage(DXGI_DEBUG_ALL, i, nullptr, &size);
+    auto *message = ArenaPush<DXGI_INFO_QUEUE_MESSAGE>(scratch.arena, size);
+    queue->GetMessage(DXGI_DEBUG_ALL, i, message, &size);
+
+    const char *producer = message->Producer == DXGI_DEBUG_D3D11 ? "D3D11" : "DXGI";
+    fprintf(stderr, "%s %s: %s\n", producer, DX11_InfoQueueSeverityName_(message->Severity), message->pDescription);
+  }
+  queue->ClearStoredMessages(DXGI_DEBUG_ALL);
+}
+
+// prints the debug layer messages since the last call.
+inline void DX11_FlushInfoQueue(DX11_GPU gpu)
+{
+  if (gpu.dxgiInfoQueue != nullptr)
+  {
+    DX11_FlushInfoQueue_(gpu.dxgiInfoQueue);
+  }
+}
+
 inline void DX11_ReportLiveObjects()
 {
   IDXGIDebug1 *debug = nullptr;
@@ -199,17 +257,5 @@ inline void DX11_ReportLiveObjects()
   queue->ClearStoredMessages(DXGI_DEBUG_ALL);
   auto rloFlags = static_cast<DXGI_DEBUG_RLO_FLAGS>(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL);
   debug->ReportLiveObjects(DXGI_DEBUG_ALL, rloFlags);
-
-  auto scratch = ScratchBegin();
-  Defer(ScratchEnd(scratch););
-
-  UINT64 count = queue->GetNumStoredMessages(DXGI_DEBUG_ALL);
-  for (UINT64 i = 0; i < count; i += 1)
-  {
-    SIZE_T size = 0;
-    queue->GetMessage(DXGI_DEBUG_ALL, i, nullptr, &size);
-    auto *message = static_cast<DXGI_INFO_QUEUE_MESSAGE *>(ArenaPushEx(scratch.arena, size, alignof(DXGI_INFO_QUEUE_MESSAGE)));
-    queue->GetMessage(DXGI_DEBUG_ALL, i, message, &size);
-    fprintf(stderr, "%s\n", message->pDescription);
-  }
+  DX11_FlushInfoQueue_(queue);
 }

@@ -136,7 +136,7 @@ inline bool DX11_UpdateTransientBuffer(DX11_GPU gpu, DX11_Transient_Buffer buffe
   D3D11_BUFFER_DESC desc = {};
   static_cast<ID3D11Buffer *>(resource)->GetDesc(&desc);
   assert(bytes.count <= desc.ByteWidth && "more data than the buffer's capacity");
-  assert(bytes.count % desc.StructureByteStride == 0 && "bytes aren't a whole number of elements");
+  assert(bytes.count % desc.StructureByteStride == 0 && "bytes aren't whole number of elements");
 #endif
 
   return DX11_WriteBuffer_(gpu, resource, bytes);

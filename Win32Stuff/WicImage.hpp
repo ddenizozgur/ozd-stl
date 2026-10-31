@@ -8,7 +8,6 @@
 #include "../Base/Math.hpp"
 #include "../Base/Slice.hpp"
 #include "Com.hpp"
-#include <stdio.h>
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -102,11 +101,9 @@ inline const GUID &Win32_WicContainerFrom_(Image_File_Format format)
 inline IWICImagingFactory *Win32_CreateWicFactory_()
 {
   IWICImagingFactory *factory = nullptr;
-  HRESULT result = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
-  if (result == CO_E_NOTINITIALIZED)
-  {
-    fprintf(stderr, "COM isn't initialized on this thread, call Win32_InitComOnThread first\n");
-  }
+  auto result = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
+  assert(SUCCEEDED(result) && "COM isn't initialized on this thread, call Win32_InitComOnThread first");
+  (void)result;
   return factory;
 }
 
@@ -117,12 +114,9 @@ inline Pair<Win32_Image, bool>
 Win32_WicDecodeImageAs(Arena_Allocator *arena, Slice<u8> fileBytes, Image_Format destFormat)
 {
   IWICImagingFactory *factory = Win32_CreateWicFactory_();
-  if (factory == nullptr)
-  {
-    return {};
-  }
   Defer(factory->Release(););
 
+  assert(fileBytes.count <= MAXDWORD && "WIC reads at most 4 GiB from memory");
   IWICStream *stream = nullptr;
   factory->CreateStream(&stream);
   Defer(stream->Release(););
@@ -178,10 +172,6 @@ inline Pair<Slice<u8>, bool>
 Win32_WicEncodeImageAs(Arena_Allocator *arena, Win32_Image image, Image_File_Format fileFormat)
 {
   IWICImagingFactory *factory = Win32_CreateWicFactory_();
-  if (factory == nullptr)
-  {
-    return {};
-  }
   Defer(factory->Release(););
 
   const GUID &wicFormat = Win32_WicPixelFormatFrom_(image.format);
