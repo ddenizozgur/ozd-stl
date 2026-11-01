@@ -98,7 +98,7 @@ struct DX11_GPU
   ID3D11Device1 *device1;
   ID3D11DeviceContext1 *immediateContext1;
   IDXGIAdapter1 *adapter1;
-  IDXGIInfoQueue *dxgiInfoQueue; // only with a debug device, holds the D3D11 and DXGI messages
+  IDXGIInfoQueue *dxgiInfoQueue; // holds both D3D11 and DXGI messages
 };
 
 [[nodiscard]]
@@ -162,7 +162,6 @@ DX11_CreateGPU(IDXGIFactory6 *factory,
   return {{device1, immediateContext1, adapter1, dxgiInfoQueue}, true};
 }
 
-// name, vendor/device IDs, video memory sizes, flags
 [[nodiscard]]
 inline DXGI_ADAPTER_DESC1 DX11_GetAdapterDesc1(DX11_GPU gpu)
 {
@@ -212,7 +211,6 @@ DX11_InfoQueueSeverityName_(DXGI_INFO_QUEUE_MESSAGE_SEVERITY severity)
   }
 }
 
-// prints the stored messages to stderr
 inline void DX11_FlushInfoQueue_(IDXGIInfoQueue *queue)
 {
   UINT64 count = queue->GetNumStoredMessagesAllowedByRetrievalFilters(DXGI_DEBUG_ALL);

@@ -51,7 +51,6 @@ constexpr usize ArenaPosition(const Arena_Allocator *arena)
 [[nodiscard]]
 inline void *ArenaPushEx(Arena_Allocator *arena, usize size, usize alignment)
 {
-  // Windows always zeroes fresh commits.
   void *res = BumpPushEx(&arena->bump, size, alignment);
   if (res == nullptr)
   {

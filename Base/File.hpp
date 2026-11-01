@@ -166,8 +166,8 @@ inline Pair<Slice<u8>, bool>
 Win32_ReadEntireFile(Arena_Allocator *arena, String path,
                      usize alignment = WIN32_FILE_READ_DEFAULT_ALIGNMENT)
 {
-  auto [file, ok] = Win32_FileOpen(path);
-  if (!ok)
+  auto [file, fileOk] = Win32_FileOpen(path);
+  if (!fileOk)
   {
     return {};
   }
@@ -186,8 +186,8 @@ Win32_ReadEntireFile(Arena_Allocator *arena, String path,
 
 inline bool Win32_WriteEntireFile(String path, Slice<u8> data)
 {
-  auto [file, ok] = Win32_FileOpen(path, File_Mode_Flag_Write, File_Share_Flag_None);
-  if (!ok)
+  auto [file, fileOk] = Win32_FileOpen(path, File_Mode_Flag_Write, File_Share_Flag_None);
+  if (!fileOk)
   {
     return false;
   }
@@ -201,7 +201,7 @@ inline bool Win32_WriteEntireFile(String path, Slice<u8> data)
 [[nodiscard]]
 inline String Win32_GetExeDirectory(Arena_Allocator *arena)
 {
-  wchar_t buffer[MAX_PATH];
+  wchar_t buffer[MAX_PATH]; // TODO: longer paths ?
   usize length = GetModuleFileNameW(nullptr, buffer, MAX_PATH);
   String exePath = Win32_StringFrom16(arena, {buffer, length});
   return StringBeforeLastInclusive(exePath, StringLit("\\"));

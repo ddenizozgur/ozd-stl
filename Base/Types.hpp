@@ -49,8 +49,6 @@ struct Type_Identity
 template <typename T>
 using Non_Deduced = typename Type_Identity<T>::Type;
 
-// Pair<i32, bool> Find(...) { return {index, true}; }
-// auto [index, found] = Find(...);
 template <typename A, typename B>
 struct Pair
 {

@@ -1,8 +1,5 @@
 #pragma once
-
-//
 // requires Windows 10 version 1803.
-//
 
 #include "Virtual.hpp"
 
