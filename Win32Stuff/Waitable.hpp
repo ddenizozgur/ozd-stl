@@ -77,8 +77,7 @@ Win32_WaitAny(Slice<Win32_Waitable> waitables, u32 timeoutMs = INFINITE, Wait_Fl
 // Also wakes when the thread has window messages
 [[nodiscard]]
 inline Pair<u32, Wait_Result>
-Win32_WaitAnyOrWindowMessages(Slice<Win32_Waitable> waitables, u32 timeoutMs = INFINITE,
-                              Wait_Flags flags = Wait_Flag_None)
+Win32_WaitAnyOrWindowMessages(Slice<Win32_Waitable> waitables, u32 timeoutMs = INFINITE, Wait_Flags flags = Wait_Flag_None)
 {
   assert(waitables.count < MAXIMUM_WAIT_OBJECTS && "Windows waits on at most 63 handles plus window messages");
 

@@ -85,7 +85,7 @@ int main()
         DX11_ReleaseSwapchain(&swapchain););
 
   auto arena = ArenaInit();
-  String shaderPath = Win32_PathFromExe(&arena, StringLit("../Shaders/Textured.hlsl"));
+  auto shaderPath = Win32_PathFromExe(&arena, StringLit("../Shaders/Textured.hlsl"));
   auto [vsBytes, vsOk] = DX11_CompileShaderFromFile(&arena, shaderPath, "VSMain", DX11_VERTEX_SHADER_TARGET);
   auto [psBytes, psOk] = DX11_CompileShaderFromFile(&arena, shaderPath, "PSMain", DX11_PIXEL_SHADER_TARGET);
   auto vertexShader = DX11_CreateVertexShader(gpu, vsBytes);
@@ -93,10 +93,10 @@ int main()
   Defer(Win32_ComSafeRelease(&vertexShader);
         Win32_ComSafeRelease(&pixelShader););
 
-  String imagePath = Win32_PathFromExe(&arena, StringLit("../Assets/Pattern.png"));
+  auto imagePath = Win32_PathFromExe(&arena, StringLit("../Assets/Pattern.png"));
   auto [fileBytes, fileOk] = Win32_ReadEntireFile(&arena, imagePath);
   auto [image, imageOk] = Win32_WicDecodeImageAs(&arena, fileBytes, Image_Format_RGBA8Premultiplied);
-  DXGI_FORMAT textureFormat = DX11_TextureFormatFromImage(image.format, true);
+  auto textureFormat = DX11_TextureFormatFromImage(image.format, true);
   auto [texture, textureOk] = DX11_CreateTexture2D(gpu, image.pixels, image.size, textureFormat, true);
   Defer(DX11_ReleaseTexture2D(&texture););
 
@@ -107,8 +107,8 @@ int main()
         Win32_ComSafeRelease(&blend);
         DX11_ReleaseConstantBuffer(&constants););
 
-  Vector2<u32> textureSize = DX11_GetTexture2DSize(texture);
-  f32 imageAspect = static_cast<f32>(textureSize.width) / textureSize.height;
+  auto textureSize = DX11_GetTexture2DSize(texture);
+  auto imageAspect = static_cast<f32>(textureSize.width) / textureSize.height;
 
   ShowWindow(hWnd, SW_SHOW);
   auto timeStart = Win32_NowNanoseconds();
@@ -130,14 +130,14 @@ int main()
     }
     DX11_ResizeSwapchain(gpu, &swapchain, g.clientSize);
 
-    Vector2<u32> swapchainSize = DX11_GetSwapchainSize(swapchain);
+    auto swapchainSize = DX11_GetSwapchainSize(swapchain);
     {
       Frame frame = {
         .aspect = static_cast<f32>(swapchainSize.width) / swapchainSize.height,
         .imageAspect = imageAspect,
         .time = time,
       };
-      DX11_UpdateConstantBuffer(gpu, constants, SliceAsBytes(Slice<Frame>{&frame, 1}));
+      DX11_UpdateConstantBuffer(gpu, constants, SliceAsBytes(SliceMake(&frame, 1)));
     }
 
     {

@@ -1,6 +1,14 @@
 #pragma once
 
 #include "String.hpp"
+#include <winternl.h>
+#pragma comment(lib, "ntdll")
+
+// Windows 8+, the loader's full path of a module.
+// Same as GetModuleFileNameW, but returns failure as NTSTATUS, GetLastError() might be stale.
+extern "C" __declspec(dllimport) NTSTATUS NTAPI LdrGetDllFullName(PVOID DllHandle, PUNICODE_STRING FullDllName);
+// from ntstatus.h
+inline constexpr NTSTATUS WIN32_STATUS_BUFFER_TOO_SMALL = static_cast<NTSTATUS>(0xC0000023);
 
 inline constexpr usize WIN32_FILE_IO_CHUNK_SIZE = Megabytes(32);
 inline constexpr usize WIN32_FILE_READ_DEFAULT_ALIGNMENT = 8;
@@ -201,9 +209,19 @@ inline bool Win32_WriteEntireFile(String path, Slice<u8> data)
 [[nodiscard]]
 inline String Win32_GetExeDirectory(Arena_Allocator *arena)
 {
-  wchar_t buffer[MAX_PATH]; // TODO: longer paths ?
-  usize length = GetModuleFileNameW(nullptr, buffer, MAX_PATH);
-  String exePath = Win32_StringFrom16(arena, {buffer, length});
+  auto scratch = ScratchBegin();
+  Defer(ScratchEnd(scratch, IsScratch(arena)););
+
+  wchar_t shortBuffer[MAX_PATH];
+  UNICODE_STRING path = {0, sizeof(shortBuffer), shortBuffer};
+  if (LdrGetDllFullName(nullptr, &path) == WIN32_STATUS_BUFFER_TOO_SMALL)
+  {
+    auto longBuffer = ArenaPushSlice<wchar_t>(scratch.arena, UNICODE_STRING_MAX_CHARS);
+    path = {0, static_cast<USHORT>(longBuffer.count * sizeof(wchar_t)), longBuffer.ptr};
+    LdrGetDllFullName(nullptr, &path);
+  }
+
+  String exePath = Win32_StringFrom16(arena, {path.Buffer, path.Length / sizeof(wchar_t)});
   return StringBeforeLastInclusive(exePath, StringLit("\\"));
 }
 
