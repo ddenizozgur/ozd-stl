@@ -13,18 +13,19 @@ A work-in-progress base layer for C++20. Windows only for now.
 
 ## Build
 
-Open an *x64 Native Tools* or *x86_x64 Cross Tools Command Prompt for VS*, then:
-
+### Visual Studio Build Tools + Clang
 ```
 cd zExample
 Build.bat release run
 ```
 
-`DX11Example` builds the same way. Arguments, in any order:
-
-- `release`: optimized build, asserts off
-- `run`: runs the program after building
-- `clang`: builds with clang++ instead of cl
+### Visual Studio Build Tools
+Using Visual Studio 2022 Developer Command Prompt or Visual Studio 2022 Developer PowerShell
+```
+cmake -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+```
+The executables can then be found in `.\zExample\Bin\` and `.\DX11Example\Bin\`
 
 ## Credits
 
