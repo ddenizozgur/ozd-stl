@@ -125,7 +125,6 @@ inline u32 DX11_GetTransientBufferCapacity(DX11_Transient_Buffer buffer)
   return DX11_GetStructuredElementCount_(buffer.view);
 }
 
-// Replaces the contents, bytes past bytes.count become undefined.
 inline bool DX11_UpdateTransientBuffer(DX11_GPU gpu, DX11_Transient_Buffer buffer, Slice<u8> bytes)
 {
   ID3D11Resource *resource = nullptr;

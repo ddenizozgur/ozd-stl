@@ -74,15 +74,13 @@ int main()
                               CW_USEDEFAULT, CW_USEDEFAULT,
                               wndRect.right - wndRect.left, wndRect.bottom - wndRect.top,
                               nullptr, nullptr, hInstance, nullptr);
-  Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic);
+  Win32_SetDarkTheme(hWnd, Window_Backdrop_Mica);
 
-  Defer(DX11_ReportLiveObjects(););
+  auto instance = DX11_CreateInstance();
+  Defer(DX11_ReleaseInstance(&instance););
 
-  auto factory6 = DX11_CreateFactory6();
-  Defer(Win32_ComSafeRelease(&factory6););
-
-  auto [gpu, gpuOk] = DX11_CreateGPU(factory6);
-  auto [swapchain, swapchainOk] = DX11_CreateSwapchain(factory6, gpu, hWnd, DX11_Swapchain_Flag_Srgb);
+  auto [gpu, gpuOk] = DX11_CreateGPU(instance);
+  auto [swapchain, swapchainOk] = DX11_CreateSwapchain(instance, gpu, hWnd, DX11_Swapchain_Flag_Srgb);
   Defer(DX11_ReleaseGPU(&gpu);
         DX11_ReleaseSwapchain(&swapchain););
 
@@ -158,7 +156,7 @@ int main()
     }
 
     DX11_PresentSwapchain(swapchain, 0);
-    DX11_FlushInfoQueue(gpu);
+    DX11_FlushInfoQueue(instance);
   }
 }
 

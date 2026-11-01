@@ -41,9 +41,10 @@ DX11_CreateBackbufferView_(ID3D11Device1 *device1, IDXGISwapChain2 *swapchain2, 
 
 [[nodiscard]]
 inline Pair<DX11_Swapchain, bool>
-DX11_CreateSwapchain(IDXGIFactory6 *factory6, DX11_GPU gpu, HWND hWnd,
+DX11_CreateSwapchain(DX11_Instance instance, DX11_GPU gpu, HWND hWnd,
                      DX11_Swapchain_Flags flags = DX11_Swapchain_Flag_None)
 {
+  auto factory6 = instance.factory6;
   BOOL allowsTearing = false;
   UINT swapchainFlags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
   factory6->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allowsTearing, sizeof(allowsTearing));
@@ -136,7 +137,7 @@ inline Wait_Result DX11_WaitForBetterLatency(DX11_Swapchain swapchain, u32 timeo
   return Win32_Wait(swapchain.frameLatency, timeoutMs);
 }
 
-// false when the device was lost.
+// false when the device gone lost.
 inline bool DX11_PresentSwapchain(DX11_Swapchain swapchain, u32 syncInterval = 1)
 {
   UINT presentFlags = 0;
