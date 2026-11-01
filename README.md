@@ -13,10 +13,19 @@ A work-in-progress base layer for C++20. Windows only for now.
 
 ## Build
 
+### Visual Studio Build Tools + Clang
 ```
 cd Example
 Build.bat release run
 ```
+
+### Visual Studio Build Tools
+Using Visual Studio 2022 Developer Command Prompt or Visual Studio 2022 Developer PowerShell
+```
+cmake -B build -G "Visual Studio 17 2022" -A x64
+cmake --build build --config Release
+```
+The executables can then be found in `.\zExample\Bin\` and `.\DX11Example\Bin\`
 
 ## Credits
 
