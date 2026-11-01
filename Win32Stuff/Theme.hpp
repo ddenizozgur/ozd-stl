@@ -27,14 +27,15 @@ inline constexpr DWM_SYSTEMBACKDROP_TYPE WIN32_BACKDROP_TYPES[Window_Backdrop_CO
 };
 
 // Backdrops require Windows 11 22H2.
-inline bool Win32_SetDarkTheme(HWND hWnd, Window_Backdrop backdrop)
+// Maximized window draws its caption buttons a few pixels too low when backdropBehindClient is set.
+inline bool Win32_SetDarkTheme(HWND hWnd, Window_Backdrop backdrop, bool backdropBehindClient = false)
 {
   BOOL darkTitleBar = true;
   auto hResult = DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE,
                                        &darkTitleBar, sizeof(darkTitleBar));
   bool ok = SUCCEEDED(hResult);
 
-  i32 margin = backdrop == Window_Backdrop_None ? 0 : -1;
+  i32 margin = backdrop != Window_Backdrop_None && backdropBehindClient ? -1 : 0;
   MARGINS margins = {margin, margin, margin, margin};
   hResult = DwmExtendFrameIntoClientArea(hWnd, &margins);
   ok &= SUCCEEDED(hResult);

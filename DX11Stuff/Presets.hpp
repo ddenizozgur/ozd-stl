@@ -1,7 +1,7 @@
 #pragma once
 
 #include "GPU.hpp"
-// D3D11 returns the same object for identical descs, so creating a preset twice is cheap.
+// D3D11 returns the same object for identical descs, so creating twice is cheap.
 
 //
 // Blend

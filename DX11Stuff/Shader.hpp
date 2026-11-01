@@ -24,18 +24,19 @@ DX11_CompileShaderFromFile(Arena_Allocator *arena, String path, const char *entr
   }
 
   // D3DCompile reads defines until a {nullptr, nullptr} entry
-  auto terminatedDefines = ArenaPushSlice<D3D_SHADER_MACRO>(scratch.arena, defines.count + 1);
-  SliceCopyInto(terminatedDefines, defines);
-  terminatedDefines[defines.count] = {};
+  auto terminated = ArenaPushSlice<D3D_SHADER_MACRO>(scratch.arena, defines.count + 1);
+  SliceCopyInto(terminated, defines);
+  terminated[defines.count] = {};
 
   String16 path16 = Win32_String16From(scratch.arena, path);
   ID3DBlob *bytecode = nullptr, *messages = nullptr;
-  HRESULT result = D3DCompileFromFile(path16.ptr, terminatedDefines.ptr,
+  HRESULT result = D3DCompileFromFile(path16.ptr, terminated.ptr,
                                       D3D_COMPILE_STANDARD_FILE_INCLUDE,
                                       entry, target, flags, 0, &bytecode, &messages);
   if (messages != nullptr)
   {
-    fprintf(stderr, "%.*s", static_cast<i32>(messages->GetBufferSize()),
+    fprintf(stderr, "%.*s",
+            static_cast<i32>(messages->GetBufferSize()),
             static_cast<const char *>(messages->GetBufferPointer()));
     messages->Release();
   }

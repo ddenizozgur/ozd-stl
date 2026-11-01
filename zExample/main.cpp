@@ -90,7 +90,7 @@ int main()
                               CW_USEDEFAULT, CW_USEDEFAULT,
                               wndRect.right - wndRect.left, wndRect.bottom - wndRect.top,
                               nullptr, nullptr, hInstance, nullptr);
-  Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic);
+  Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic, true);
   ShowWindow(hWnd, SW_SHOWMAXIMIZED);
 
   auto arena = ArenaInit();

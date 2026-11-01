@@ -42,7 +42,6 @@ inline BOOL CALLBACK Win32_OsVersionInit(PINIT_ONCE, PVOID, PVOID *)
     version->revision = revision;
   }
 
-  // DisplayVersion since 20H2, ReleaseId before it
   wchar_t release[16] = {};
   size = sizeof(release);
   if (RegGetValueW(HKEY_LOCAL_MACHINE, key, L"DisplayVersion", RRF_RT_REG_SZ, nullptr, release, &size) != ERROR_SUCCESS)

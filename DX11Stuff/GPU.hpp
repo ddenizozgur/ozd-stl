@@ -94,10 +94,9 @@ struct DX11_GPU
 };
 
 [[nodiscard]]
-inline Pair<DX11_GPU, bool>
-DX11_CreateGPU(DX11_Instance instance,
-               DXGI_GPU_PREFERENCE preference = DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
-               bool forceWarp = false)
+inline Pair<DX11_GPU, bool> DX11_CreateGPU(DX11_Instance instance,
+                                           DXGI_GPU_PREFERENCE preference = DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
+                                           bool forceWarp = false)
 {
   auto factory = instance.factory6;
   UINT createFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
