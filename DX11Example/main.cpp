@@ -74,7 +74,7 @@ int main()
                               CW_USEDEFAULT, CW_USEDEFAULT,
                               wndRect.right - wndRect.left, wndRect.bottom - wndRect.top,
                               nullptr, nullptr, hInstance, nullptr);
-  // Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic);
+  Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic);
 
   auto instance = DX11_CreateInstance();
   Defer(DX11_ReleaseInstance(&instance););
