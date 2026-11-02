@@ -70,17 +70,20 @@ inline IDXGIFactory6 *DX11_Factory6FromDevice(ID3D11Device *device)
 // Device
 //
 [[nodiscard]]
-inline HRESULT DX11_CreateDeviceAndImmediateContext_(IDXGIAdapter1 *adapter, UINT createFlags,
+inline HRESULT DX11_CreateDeviceAndImmediateContext_(IDXGIAdapter1 *adapter1, UINT createFlags,
                                                      ID3D11Device **device, ID3D11DeviceContext **context)
 {
   D3D_FEATURE_LEVEL featureLevel = D3D_FEATURE_LEVEL_11_1;
-  HRESULT result = D3D11CreateDevice(adapter, D3D_DRIVER_TYPE_UNKNOWN, nullptr, createFlags,
+  HRESULT result = D3D11CreateDevice(adapter1, D3D_DRIVER_TYPE_UNKNOWN, nullptr, createFlags,
                                      &featureLevel, 1, D3D11_SDK_VERSION, device, nullptr, context);
   if (FAILED(result) && (createFlags & D3D11_CREATE_DEVICE_DEBUG))
   {
-    fprintf(stderr, "creating the D3D11 device with the debug layer failed, retrying without it\n");
+    DXGI_ADAPTER_DESC1 desc = {};
+    adapter1->GetDesc1(&desc);
+    fprintf(stderr, "creating the D3D11 device with the debug layer failed on %ls, retrying without it\n", desc.Description);
+
     createFlags &= ~D3D11_CREATE_DEVICE_DEBUG;
-    result = D3D11CreateDevice(adapter, D3D_DRIVER_TYPE_UNKNOWN, nullptr, createFlags,
+    result = D3D11CreateDevice(adapter1, D3D_DRIVER_TYPE_UNKNOWN, nullptr, createFlags,
                                &featureLevel, 1, D3D11_SDK_VERSION, device, nullptr, context);
   }
   return result;
@@ -98,7 +101,7 @@ inline Pair<DX11_GPU, bool> DX11_CreateGPU(DX11_Instance instance,
                                            DXGI_GPU_PREFERENCE preference = DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
                                            bool forceWarp = false)
 {
-  auto factory = instance.factory6;
+  auto factory6 = instance.factory6;
   UINT createFlags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
   if (instance.infoQueue != nullptr)
   {
@@ -112,14 +115,14 @@ inline Pair<DX11_GPU, bool> DX11_CreateGPU(DX11_Instance instance,
 
   if (!forceWarp)
   {
-    factory->EnumAdapterByGpuPreference(0, preference, IID_PPV_ARGS(&adapter1));
+    factory6->EnumAdapterByGpuPreference(0, preference, IID_PPV_ARGS(&adapter1));
     result = DX11_CreateDeviceAndImmediateContext_(adapter1, createFlags, &baseDevice, &baseImmediateContext);
   }
 
   if (FAILED(result))
   {
     Win32_ComSafeRelease(&adapter1);
-    factory->EnumWarpAdapter(IID_PPV_ARGS(&adapter1));
+    factory6->EnumWarpAdapter(IID_PPV_ARGS(&adapter1));
     result = DX11_CreateDeviceAndImmediateContext_(adapter1, createFlags, &baseDevice, &baseImmediateContext);
   }
 

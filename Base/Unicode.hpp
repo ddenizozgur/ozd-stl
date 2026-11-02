@@ -1,5 +1,8 @@
 #pragma once
 
+// the original implementation is from Odin's core library:
+// https://github.com/odin-lang/Odin/blob/master/core/unicode/utf8/utf8.odin
+
 #include "String.hpp"
 
 using Rune = u32;
@@ -124,7 +127,7 @@ inline Utf8_Decoded Utf8DecodeRuneBefore(String s, usize end)
 
   usize start = end - 1;
   usize limit = end >= 4 ? end - 4 : 0;
-  while (start > limit && IsUtf8Continuation(s.ptr[start]))
+  for (; start > limit && IsUtf8Continuation(s.ptr[start]);)
   {
     start -= 1;
   }
@@ -225,7 +228,7 @@ struct Utf8_Runes_Reverse
   [[nodiscard]] Utf8_Iterator_End end() const { return {}; }
 };
 
-// for (Utf8_Decoded r : StringRunes(s))
+// for (auto decoded : StringRunes(s))
 [[nodiscard]]
 constexpr Utf8_Runes StringRunes(String s)
 {
@@ -245,9 +248,9 @@ constexpr Utf8_Runes_Reverse StringRunesReverse(String s)
 [[nodiscard]]
 inline bool StringContainsRune(String s, Rune rune)
 {
-  for (Utf8_Decoded r : StringRunes(s))
+  for (auto decoded : StringRunes(s))
   {
-    if (r.rune == rune)
+    if (decoded.rune == rune)
     {
       return true;
     }
@@ -259,11 +262,11 @@ inline bool StringContainsRune(String s, Rune rune)
 [[nodiscard]]
 inline Utf8_Decoded StringFindLast(String s, String runes)
 {
-  for (Utf8_Decoded r : StringRunesReverse(s))
+  for (auto decoded : StringRunesReverse(s))
   {
-    if (StringContainsRune(runes, r.rune))
+    if (StringContainsRune(runes, decoded.rune))
     {
-      return r;
+      return decoded;
     }
   }
   return {.rune = RUNE_ERROR, .offset = s.count, .size = 0};
@@ -274,7 +277,7 @@ inline Utf8_Decoded StringFindLast(String s, String runes)
 inline String StringBeforeLast(String s, String runes)
 {
   String res = s;
-  if (Utf8_Decoded found = StringFindLast(s, runes); found.size != 0)
+  if (auto found = StringFindLast(s, runes); found.size != 0)
   {
     res = {s.ptr, found.offset};
   }
@@ -285,7 +288,7 @@ inline String StringBeforeLast(String s, String runes)
 inline String StringBeforeLastInclusive(String s, String runes)
 {
   String res = s;
-  if (Utf8_Decoded found = StringFindLast(s, runes); found.size != 0)
+  if (auto found = StringFindLast(s, runes); found.size != 0)
   {
     res = {s.ptr, found.offset + found.size};
   }
@@ -296,7 +299,7 @@ inline String StringBeforeLastInclusive(String s, String runes)
 inline String StringAfterLast(String s, String runes)
 {
   String res = {};
-  if (Utf8_Decoded found = StringFindLast(s, runes); found.size != 0)
+  if (auto found = StringFindLast(s, runes); found.size != 0)
   {
     usize start = found.offset + found.size;
     res = {s.ptr + start, s.count - start};
@@ -308,7 +311,7 @@ inline String StringAfterLast(String s, String runes)
 inline String StringAfterLastInclusive(String s, String runes)
 {
   String res = {};
-  if (Utf8_Decoded found = StringFindLast(s, runes); found.size != 0)
+  if (auto found = StringFindLast(s, runes); found.size != 0)
   {
     res = {s.ptr + found.offset, s.count - found.offset};
   }
@@ -316,7 +319,7 @@ inline String StringAfterLastInclusive(String s, String runes)
 }
 
 //
-// UTF-16 surrogates
+// UTF-16
 //
 [[nodiscard]]
 constexpr bool IsHighSurrogate(u16 unit)

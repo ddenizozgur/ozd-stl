@@ -1,4 +1,4 @@
-cbuffer Frame : register(b0)
+cbuffer Frame_Constants : register(b0)
 {
   float aspect;
   float imageAspect;
@@ -14,7 +14,8 @@ struct Pixel
   float2 uv : TEXCOORD;
 };
 
-static const float2 CORNERS[6] = {
+static const float2 CORNERS[6] =
+{
   float2(-1, -1), float2(-1, 1), float2(1, 1),
   float2(-1, -1), float2(1, 1), float2(1, -1),
 };

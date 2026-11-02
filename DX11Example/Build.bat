@@ -33,7 +33,7 @@ set "compileFlags=%compileFlags% -Wsign-compare"
 set "compileFlags=%compileFlags% -Wno-parentheses" & rem allows if (int x = Fun(); x = Next())
 set "compileFlags=%compileFlags% -Wundef"          & rem undefined macro in #if
 set "compileFlags=%compileFlags% -Wshadow"
-if %release%==1 (set "compileFlags=%compileFlags% -O3 -DNDEBUG") else (set "compileFlags=%compileFlags% -g -O1")
+if %release%==1 (set "compileFlags=%compileFlags% -O2 -DNDEBUG") else (set "compileFlags=%compileFlags% -g -O0")
 
 set linkFlags=
 set "linkFlags=%linkFlags% -Xlinker /NODEFAULTLIB:libcpmt.lib" & rem no static C++ standard library

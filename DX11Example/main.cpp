@@ -43,7 +43,7 @@ void UpdateTitle(HWND hWnd, f32 frameTime)
   frameCounter += 1;
 }
 
-struct alignas(16) Frame
+struct alignas(16) Frame_Constants
 {
   f32 aspect;
   f32 imageAspect;
@@ -102,7 +102,7 @@ int main()
 
   auto sampler = DX11_CreateSamplerState(gpu, DX11_SAMPLER_DESC_LINEAR_WRAP);
   auto blend = DX11_CreateBlendState(gpu, DX11_BLEND_DESC_PREMULTIPLIED_ALPHA);
-  auto [constants, constantsOk] = DX11_CreateConstantBuffer(gpu, sizeof(Frame));
+  auto [constants, constantsOk] = DX11_CreateConstantBuffer(gpu, sizeof(Frame_Constants));
   Defer(Win32_ComSafeRelease(&sampler);
         Win32_ComSafeRelease(&blend);
         DX11_ReleaseConstantBuffer(&constants););
@@ -110,7 +110,7 @@ int main()
   auto textureSize = DX11_GetTexture2DSize(texture);
   auto imageAspect = static_cast<f32>(textureSize.width) / textureSize.height;
 
-  ShowWindow(hWnd, SW_SHOW);
+  ShowWindow(hWnd, SW_SHOWMAXIMIZED);
   auto timeStart = Win32_NowNanoseconds();
   auto timeLast = timeStart;
 
@@ -132,12 +132,12 @@ int main()
 
     auto swapchainSize = DX11_GetSwapchainSize(swapchain);
     {
-      Frame frame = {
+      Frame_Constants frameConstants = {
         .aspect = static_cast<f32>(swapchainSize.width) / swapchainSize.height,
         .imageAspect = imageAspect,
         .time = time,
       };
-      DX11_UpdateConstantBuffer(gpu, constants, SliceAsBytes(SliceMake(&frame, 1)));
+      DX11_UpdateConstantBuffer(gpu, constants, SliceAsBytes(SliceMake(&frameConstants, 1)));
     }
 
     {

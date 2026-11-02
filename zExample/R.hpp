@@ -311,12 +311,12 @@ inline const u8 *R_GlyphRows(R_UnicodeFont font, Rune rune)
 {
   Pair<usize, bool> search = {};
   Rune candidates[3] = {rune, RUNE_ERROR, '?'};
-  for (auto r : SliceFromArray(candidates))
+  for (auto candidate : SliceFromArray(candidates))
   {
     // runes above 0xFFFF would wrap around in the u16 search
-    if (r <= 0xFFFF)
+    if (candidate <= 0xFFFF)
     {
-      search = SliceBinarySearch(font.sortedRunes, r);
+      search = SliceBinarySearch(font.sortedRunes, candidate);
       if (search.second)
       {
         break;
