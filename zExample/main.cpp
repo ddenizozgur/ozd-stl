@@ -80,7 +80,7 @@ int main()
   RegisterClassW(&wndClass);
 
   DWORD dwStyle = WS_OVERLAPPEDWINDOW;
-  DWORD dwExStyle = 0; // DX11 flip model: WS_EX_NOREDIRECTIONBITMAP
+  DWORD dwExStyle = 0;
 
   Vector2<i32> frameBufferSize = {720, 480};
   RECT wndRect = {0, 0, frameBufferSize.x * 2, frameBufferSize.y * 2};
@@ -125,7 +125,20 @@ int main()
       R_FillRect(&frameBuffer, R_PositionFrom(position), {32 * 2, 24 * 2}, R_CGA_LIGHT_RED);
       R_FillRectAntialiased(&frameBuffer, position + Vector2<f32>{0, 40 * 2}, {32 * 2, 24 * 2}, R_CGA_LIGHT_RED);
 
-      R_HexDump(&frameBuffer, R_FONT_COURIER, {}, (void *)main, 16, 48);
+      auto font = R_FONT_UNIFONT;
+      i32 columns = frameBuffer.size.width / font.glyphSize.width;
+      i32 rows = frameBuffer.size.height / font.glyphSize.height;
+      usize glyph = 0;
+      for (i32 y = 0; y < rows; y += 1)
+      {
+        for (i32 x = 0; x < columns; x += 1)
+        {
+          Rune rune = font.sortedRunes[glyph % font.sortedRunes.count];
+          Vector2<i32> cell = {x * font.glyphSize.width, y * font.glyphSize.height};
+          R_PutRune(&frameBuffer, font, cell, R_CGA_YELLOW, rune);
+          glyph += 1;
+        }
+      }
     }
 
     // DwmFlush();
@@ -154,8 +167,6 @@ inline LRESULT CALLBACK ExampleWndProc(HWND hWnd, UINT message, WPARAM wParam, L
   }
   case WM_DPICHANGED:
   {
-    // the window moved to a monitor with a different scale, or the user changed the scale.
-    // lParam is the size and position Windows suggests at the new dpi.
     auto suggested = reinterpret_cast<RECT *>(lParam);
     SetWindowPos(hWnd, nullptr,
                  suggested->left, suggested->top,

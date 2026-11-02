@@ -1,7 +1,8 @@
 #pragma once
 
 #include "../Base/ArenaAllocator.hpp"
-#include "../Base/String.hpp"
+#include "../Base/Unicode.hpp"
+#include "R_FontUnifont.hpp"
 #include "R_Fonts.hpp"
 #include <math.h>
 
@@ -198,14 +199,13 @@ inline void R_FillRect(R_FrameBuffer *frameBuffer,
   }
 }
 
-inline void R_PutChar(R_FrameBuffer *frameBuffer, R_BitmapFont font,
-                      Vector2<i32> position, R_B8G8R8A8 color, u8 c)
+inline void R_PutGlyph_(R_FrameBuffer *frameBuffer, const u8 *rows, Vector2<i32> glyphSize,
+                        Vector2<i32> position, R_B8G8R8A8 color)
 {
   auto topLeft = Vector2<i32>{Maximum(0, -position.x), Maximum(0, -position.y)};
-  auto bottomRight = Vector2<i32>{Minimum(font.glyphSize.width, frameBuffer->size.width - position.x),
-                                  Minimum(font.glyphSize.height, frameBuffer->size.height - position.y)};
+  auto bottomRight = Vector2<i32>{Minimum(glyphSize.width, frameBuffer->size.width - position.x),
+                                  Minimum(glyphSize.height, frameBuffer->size.height - position.y)};
 
-  const u8 *rows = font.bitmap.ptr + c * font.glyphSize.height;
   for (auto y = topLeft.y; y < bottomRight.y; y += 1)
   {
     u8 row = rows[y];
@@ -218,6 +218,13 @@ inline void R_PutChar(R_FrameBuffer *frameBuffer, R_BitmapFont font,
       }
     }
   }
+}
+
+inline void R_PutChar(R_FrameBuffer *frameBuffer, R_BitmapFont font,
+                      Vector2<i32> position, R_B8G8R8A8 color, u8 c)
+{
+  const u8 *rows = font.bitmap.ptr + c * font.glyphSize.height;
+  R_PutGlyph_(frameBuffer, rows, font.glyphSize, position, color);
 }
 
 inline constexpr i32 R_TAB_WIDTH = 4;
@@ -297,6 +304,95 @@ PrintfLike(5, 6) inline void R_PrintFmtAscii(R_FrameBuffer *frameBuffer, R_Bitma
   va_end(args);
 
   R_PutStringAscii(frameBuffer, font, position, color, text);
+}
+
+[[nodiscard]]
+inline const u8 *R_GlyphRows(R_UnicodeFont font, Rune rune)
+{
+  Pair<usize, bool> search = {};
+  Rune candidates[3] = {rune, RUNE_ERROR, '?'};
+  for (auto r : SliceFromArray(candidates))
+  {
+    // runes above 0xFFFF would wrap around in the u16 search
+    if (r <= 0xFFFF)
+    {
+      search = SliceBinarySearch(font.sortedRunes, r);
+      if (search.second)
+      {
+        break;
+      }
+    }
+  }
+  assert(search.second && "the font has no glyph for '?'");
+  return font.bitmap.ptr + search.first * font.glyphSize.height;
+}
+
+inline void R_PutRune(R_FrameBuffer *frameBuffer, R_UnicodeFont font,
+                      Vector2<i32> position, R_B8G8R8A8 color, Rune rune)
+{
+  R_PutGlyph_(frameBuffer, R_GlyphRows(font, rune), font.glyphSize, position, color);
+}
+
+inline void R_PutStringUtf8(R_FrameBuffer *frameBuffer, R_UnicodeFont font,
+                            Vector2<i32> position, R_B8G8R8A8 color, String text)
+{
+  auto cursor = position;
+  usize tabStopWidth = font.glyphSize.width * R_TAB_WIDTH;
+  for (auto decoded : StringRunes(text))
+  {
+    if (decoded.rune == '\n')
+    {
+      cursor.x = position.x;
+      cursor.y += font.glyphSize.height;
+      if (cursor.y >= frameBuffer->size.height)
+      {
+        break;
+      }
+    }
+    else if (decoded.rune == '\t')
+    { // moves at least one glyph
+      usize offset = cursor.x - position.x + font.glyphSize.width;
+      cursor.x = position.x + static_cast<i32>(AlignForward(offset, tabStopWidth));
+    }
+    else
+    {
+      R_PutRune(frameBuffer, font, cursor, color, decoded.rune);
+      cursor.x += font.glyphSize.width;
+    }
+  }
+}
+
+[[nodiscard]]
+inline Vector2<i32> R_MeasureStringUtf8(R_UnicodeFont font, String text)
+{
+  if (text.count == 0)
+  {
+    return {};
+  }
+
+  usize tabStopWidth = font.glyphSize.width * R_TAB_WIDTH;
+  i32 lineWidth = 0;
+  i32 maxWidth = 0;
+  i32 lineCount = 1;
+  for (auto decoded : StringRunes(text))
+  {
+    if (decoded.rune == '\n')
+    {
+      lineWidth = 0;
+      lineCount += 1;
+    }
+    else if (decoded.rune == '\t')
+    {
+      usize offset = lineWidth + font.glyphSize.width;
+      lineWidth = static_cast<i32>(AlignForward(offset, tabStopWidth));
+    }
+    else
+    {
+      lineWidth += font.glyphSize.width;
+    }
+    maxWidth = Maximum(maxWidth, lineWidth);
+  }
+  return {maxWidth, lineCount * font.glyphSize.height};
 }
 
 inline void R_HexDump(R_FrameBuffer *frameBuffer, R_BitmapFont font, Vector2<i32> position,

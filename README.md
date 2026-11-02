@@ -38,3 +38,5 @@ The executables can then be found in `.\zExample\Bin\` and `.\DX11Example\Bin\`
 ## Credits
 
 Some of the bitmap fonts in `zExample/R_Fonts.hpp` are from VileR's [VGA text mode fonts](https://github.com/viler-int10h/vga-text-mode-fonts) collection.
+
+`zExample/R_FontUnifont.hpp` holds the 8x16 glyphs of [GNU Unifont](https://unifoundry.com/unifont/) 15.1.05, under the SIL Open Font License 1.1 included in that file.

@@ -15,6 +15,19 @@ constexpr R_BitmapFont R_BitmapFontFrom(Slice<u8> bitmap, Vector2<i32> glyphSize
   return {bitmap, glyphSize};
 }
 
+struct R_UnicodeFont
+{
+  Slice<u16> sortedRunes;
+  Slice<u8> bitmap;
+  Vector2<i32> glyphSize;
+};
+
+[[nodiscard]]
+constexpr R_UnicodeFont R_UnicodeFontFrom(Slice<u16> sortedRunes, Slice<u8> bitmap, Vector2<i32> glyphSize)
+{
+  return {sortedRunes, bitmap, glyphSize};
+}
+
 inline unsigned char R_FONT_DEBUG_BITMAP[] = {
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

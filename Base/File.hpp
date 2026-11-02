@@ -1,6 +1,6 @@
 #pragma once
 
-#include "String.hpp"
+#include "Unicode.hpp"
 #include <winternl.h>
 #pragma comment(lib, "ntdll")
 
