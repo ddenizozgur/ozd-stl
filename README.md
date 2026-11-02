@@ -4,7 +4,10 @@ A work-in-progress base layer for C++20. Windows only for now.
 
 ## Requirements
 
-- **Windows 10 1803** or newer.
+- **Windows**
+  - `Base/`: Windows 8
+  - `Win32Stuff/`: Windows 8, `MagicRingBuffer.hpp` needs Windows 10 1803
+  - `DX11Stuff/`: Windows 10 1803
 - **Visual Studio Build Tools** with the *Desktop development with C++* workload: [download](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022)
 - Or [portable-msvc.py](https://gist.github.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977). Run `setup_x64.bat` from its output folder before building.
 - Optional **Clang**: install it from the [LLVM releases](https://github.com/llvm/llvm-project/releases) (`LLVM-<version>-win64.exe`) or with:
