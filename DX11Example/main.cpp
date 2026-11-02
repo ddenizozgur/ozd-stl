@@ -117,8 +117,8 @@ int main()
   for (; !g.shouldClose;)
   {
     auto timeNow = Win32_NowNanoseconds();
-    auto frameTime = static_cast<f32>(SecondsFromNano(timeNow - timeLast));
-    auto time = static_cast<f32>(SecondsFromNano(timeNow - timeStart));
+    f32 frameTime = SecondsFromNano(timeNow - timeLast);
+    f32 time = SecondsFromNano(timeNow - timeStart);
     timeLast = timeNow;
     UpdateTitle(hWnd, frameTime);
 

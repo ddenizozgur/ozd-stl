@@ -156,7 +156,7 @@ Win32_WicDecodeImageAs(Arena_Allocator *arena, Slice<u8> fileBytes, Image_Format
   }
 
   // truncated file fails here
-  auto stride = static_cast<UINT>(size.width * bytesPerPixel);
+  UINT stride = size.width * bytesPerPixel;
   if (FAILED(converter->CopyPixels(nullptr, stride, static_cast<UINT>(pixels.count), pixels.ptr)))
   {
     ArenaPopTo(arena, rollback);
@@ -175,7 +175,7 @@ Win32_WicEncodeImageAs(Arena_Allocator *arena, Win32_Image image, Image_File_For
   Defer(factory->Release(););
 
   const GUID &wicFormat = Win32_WicPixelFormatFrom_(image.format);
-  auto stride = static_cast<UINT>(image.size.width * ImageFormatBytesPerPixel(image.format));
+  UINT stride = image.size.width * ImageFormatBytesPerPixel(image.format);
   IWICBitmap *bitmap = nullptr;
   if (FAILED(factory->CreateBitmapFromMemory(image.size.width, image.size.height, wicFormat, stride,
                                              static_cast<UINT>(image.pixels.count), image.pixels.ptr, &bitmap)))
@@ -208,7 +208,7 @@ Win32_WicEncodeImageAs(Arena_Allocator *arena, Win32_Image image, Image_File_For
 
   STATSTG stat = {};
   stream->Stat(&stat, STATFLAG_NONAME);
-  auto bytes = ArenaPushSlice<u8>(arena, static_cast<usize>(stat.cbSize.QuadPart));
+  auto bytes = ArenaPushSlice<u8>(arena, stat.cbSize.QuadPart);
   if (bytes.ptr == nullptr)
   {
     return {};

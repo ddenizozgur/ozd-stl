@@ -71,7 +71,7 @@ struct R_FrameBuffer
 inline R_FrameBuffer R_CreateFrameBuffer(Arena_Allocator *arena, Vector2<i32> size)
 {
   auto count = static_cast<usize>(size.width) * size.height;
-  auto data = ArenaPushSliceEx<R_B8G8R8A8>(arena, count, 16);
+  auto data = ArenaPushSliceWithAlignment<R_B8G8R8A8>(arena, count, 16);
   if (data.ptr == nullptr)
   {
     return {};
@@ -239,8 +239,7 @@ inline void R_PutStringAscii(R_FrameBuffer *frameBuffer, R_BitmapFont font,
       }
     }
     else if (c == '\t')
-    {
-      // moves at least one glyph, so a tab right at a stop goes to the next one
+    { // moves at least one glyph
       usize offset = cursor.x - position.x + font.glyphSize.width;
       cursor.x = position.x + static_cast<i32>(AlignForward(offset, tabStopWidth));
     }

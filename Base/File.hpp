@@ -8,7 +8,7 @@
 // Same as GetModuleFileNameW, but returns failure as NTSTATUS, GetLastError() might be stale.
 extern "C" __declspec(dllimport) NTSTATUS NTAPI LdrGetDllFullName(PVOID DllHandle, PUNICODE_STRING FullDllName);
 // from ntstatus.h
-inline constexpr NTSTATUS WIN32_STATUS_BUFFER_TOO_SMALL = static_cast<NTSTATUS>(0xC0000023);
+inline constexpr NTSTATUS WIN32_STATUS_BUFFER_TOO_SMALL = 0xC0000023;
 
 inline constexpr usize WIN32_FILE_IO_CHUNK_SIZE = Megabytes(32);
 inline constexpr usize WIN32_FILE_READ_DEFAULT_ALIGNMENT = 8;
@@ -127,7 +127,7 @@ Win32_FileRead(Arena_Allocator *arena,
                Win32_File file, usize offset, usize size,
                usize alignment = WIN32_FILE_READ_DEFAULT_ALIGNMENT)
 {
-  auto buffer = ArenaPushSliceEx<u8>(arena, size, alignment);
+  auto buffer = ArenaPushSliceWithAlignment<u8>(arena, size, alignment);
   if (buffer.ptr == nullptr)
   {
     return {};

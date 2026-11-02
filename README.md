@@ -4,26 +4,31 @@ A work-in-progress base layer for C++20. Windows only for now.
 
 ## Requirements
 
-- **Visual Studio Build Tools** with the *Desktop development with C++* workload, for cl, the Windows SDK and C runtime: [download](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022)
+- **Windows 10 1803** or newer.
+- **Visual Studio Build Tools** with the *Desktop development with C++* workload: [download](https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022)
 - Or [portable-msvc.py](https://gist.github.com/mmozeiko/7f3162ec2988e81e56d5c4e22cde9977). Run `setup_x64.bat` from its output folder before building.
 - Optional **Clang**: install it from the [LLVM releases](https://github.com/llvm/llvm-project/releases) (`LLVM-<version>-win64.exe`) or with:
   ```
   winget install LLVM.LLVM
   ```
 
+## Usage
+
+Copy the folders you need side by side into your project, include the headers and compile as C++20. Headers include each other with relative paths and link their own libraries with `#pragma comment(lib)`, so no include paths or linker settings are needed.
+
 ## Build
 
-### Visual Studio Build Tools + Clang
+### Visual Studio Build Tools
+From an *x64 Native Tools* or *x86_x64 Cross Tools Command Prompt for VS*:
 ```
 cd zExample
 Build.bat release run
 ```
+or `Build.bat clang release run`
 
-### Visual Studio Build Tools
-Using Visual Studio 2022 Developer Command Prompt or Visual Studio 2022 Developer PowerShell
 ```
-cmake -B build -G "Visual Studio 17 2022" -A x64
-cmake --build build --config Release
+cmake -B Build
+cmake --build Build --config Release
 ```
 The executables can then be found in `.\zExample\Bin\` and `.\DX11Example\Bin\`
 

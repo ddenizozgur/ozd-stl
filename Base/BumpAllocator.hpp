@@ -21,7 +21,7 @@ constexpr usize BumpPosition(const Bump_Allocator *bump)
 }
 
 [[nodiscard]]
-inline void *BumpPushEx(Bump_Allocator *bump, usize size, usize alignment)
+inline void *BumpPushWithAlignment(Bump_Allocator *bump, usize size, usize alignment)
 {
   auto baseAddress = reinterpret_cast<usize>(bump->backingBuffer.ptr);
   auto lastPosition = AlignForwardPow2(baseAddress + bump->position, alignment) - baseAddress;
@@ -52,6 +52,6 @@ constexpr void BumpPopBy(Bump_Allocator *bump, usize by)
 template <typename T>
 [[nodiscard]] inline T *BumpPush(Bump_Allocator *bump, usize count = 1)
 {
-  void *ptr = BumpPushEx(bump, sizeof(T) * count, alignof(T));
+  void *ptr = BumpPushWithAlignment(bump, sizeof(T) * count, alignof(T));
   return static_cast<T *>(ptr);
 }

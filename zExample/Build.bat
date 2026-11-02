@@ -1,11 +1,13 @@
 @echo off
 
-rem Build.bat              - debug build with cl, needs an x64 Developer Command Prompt (x64 or x86_x64)
+rem Build.bat              - debug build with cl, needs an x64 Developer Command Prompt
 rem Build.bat run          - debug build, then runs it
 rem Build.bat release      - optimized build (asserts off)
 rem Build.bat clang        - builds with clang++
 
 cd /d "%~dp0"
+
+set name=Example
 
 set release=0
 set run=0
@@ -20,23 +22,56 @@ if not exist Bin mkdir Bin
 
 if %compiler%==cl goto cl
 
-set mode=-g -O1
-if %release%==1 set mode=-O3 -DNDEBUG
-set compileFlags=-std=c++20 -Wall -Wextra -Wundef -Wshorten-64-to-32 -fno-exceptions -fno-rtti -msse4.1 -I. %mode%
-set linkFlags=-Xlinker /NODEFAULTLIB:libcpmt.lib -Xlinker /NODEFAULTLIB:msvcprt.lib
+set compileFlags=-std=c++20
+set "compileFlags=%compileFlags% -fno-exceptions"
+set "compileFlags=%compileFlags% -fno-rtti"
+set "compileFlags=%compileFlags% -msse4.1"         & rem floorf/ceilf/roundf become one roundss instruction
+if %release%==0 set "compileFlags=%compileFlags% -fstack-protector-strong"
+set "compileFlags=%compileFlags% -Wall"
+set "compileFlags=%compileFlags% -Wshorten-64-to-32"
+set "compileFlags=%compileFlags% -Wsign-compare"
+set "compileFlags=%compileFlags% -Wno-parentheses" & rem allows if (int x = Fun(); x = Next())
+set "compileFlags=%compileFlags% -Wundef"          & rem undefined macro in #if
+set "compileFlags=%compileFlags% -Wshadow"
+if %release%==1 (set "compileFlags=%compileFlags% -O3 -DNDEBUG") else (set "compileFlags=%compileFlags% -g -O1")
 
-clang++ %compileFlags% main.cpp -o Bin\Example.exe %linkFlags%
+set linkFlags=
+set "linkFlags=%linkFlags% -Xlinker /NODEFAULTLIB:libcpmt.lib" & rem no static C++ standard library
+set "linkFlags=%linkFlags% -Xlinker /NODEFAULTLIB:msvcprt.lib" & rem no DLL C++ standard library
+
+clang++ %compileFlags% main.cpp -o Bin\%name%.exe %linkFlags%
 if errorlevel 1 exit /b 1
 goto built
 
 :cl
-set mode=/Zi /Od
-if %release%==1 set mode=/O2 /DNDEBUG
-set compileFlags=/nologo /std:c++20 /W4 /wd4201 /Zc:preprocessor /utf-8 /GR- /EHs-c- /D_HAS_EXCEPTIONS=0 /I. %mode%
-set linkFlags=/INCREMENTAL:NO /NODEFAULTLIB:libcpmt.lib /NODEFAULTLIB:msvcprt.lib
+set compileFlags=/nologo /std:c++20
+set "compileFlags=%compileFlags% /GR-"                    & rem no rtti
+set "compileFlags=%compileFlags% /arch:SSE4.2"            & rem floorf/ceilf become one roundss instruction in optimized builds
+set "compileFlags=%compileFlags% /utf-8"
+set "compileFlags=%compileFlags% /Zc:preprocessor"        & rem macros expand like clang
+if %release%==1 set "compileFlags=%compileFlags% /GS-"    & rem no stack cookies in release
+set "compileFlags=%compileFlags% /W4"
+set "compileFlags=%compileFlags% /wd4244"                 & rem allows narrowing
+set "compileFlags=%compileFlags% /wd4305"                 & rem allows f32 f = 0.1
+set "compileFlags=%compileFlags% /w34388"                 & rem signed/unsigned compare of different sizes
+set "compileFlags=%compileFlags% /w34062"                 & rem enum value missing from switch
+set "compileFlags=%compileFlags% /w34668"                 & rem undefined macro in #if
+set "compileFlags=%compileFlags% /wd4100"                 & rem allows unused parameters
+set "compileFlags=%compileFlags% /wd4706"                 & rem allows if (int x = Fun(); x = Next())
+set "compileFlags=%compileFlags% /wd4201"                 & rem allows anonymous structs
+set "compileFlags=%compileFlags% /wd4324"                 & rem allows padding from alignas
+set "compileFlags=%compileFlags% /wd4245"                 & rem allows u32 x = -1
+set "compileFlags=%compileFlags% /external:anglebrackets" & rem headers included with angle brackets are external
+set "compileFlags=%compileFlags% /external:W0"            & rem no warnings from external headers
+if %release%==1 (set "compileFlags=%compileFlags% /O2 /DNDEBUG") else (set "compileFlags=%compileFlags% /Zi /Od")
 
-cl %compileFlags% main.cpp /Fe:Bin\Example.exe /Fo:Bin\ /Fd:Bin\ /link %linkFlags%
+set linkFlags=
+set "linkFlags=%linkFlags% /INCREMENTAL:NO"
+set "linkFlags=%linkFlags% /NODEFAULTLIB:libcpmt.lib" & rem no static C++ standard library
+set "linkFlags=%linkFlags% /NODEFAULTLIB:msvcprt.lib" & rem no DLL C++ standard library
+
+cl %compileFlags% main.cpp /Fe:Bin\%name%.exe /Fo:Bin\ /Fd:Bin\ /link %linkFlags%
 if errorlevel 1 exit /b 1
 
 :built
-if %run%==1 Bin\Example.exe
+if %run%==1 Bin\%name%.exe

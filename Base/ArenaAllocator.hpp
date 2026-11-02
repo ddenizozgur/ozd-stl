@@ -34,7 +34,7 @@ inline Arena_Allocator ArenaInit(usize reserveSize = ARENA_DEFAULT_RESERVE_SIZE,
 }
 
 [[nodiscard]]
-constexpr Arena_Allocator ArenaInitFromBuffer(Slice<u8> backingBuffer)
+constexpr Arena_Allocator ArenaInitFromBytes(Slice<u8> backingBuffer)
 {
   return {
     .bump = BumpInit(backingBuffer),
@@ -49,9 +49,9 @@ constexpr usize ArenaPosition(const Arena_Allocator *arena)
 }
 
 [[nodiscard]]
-inline void *ArenaPushEx(Arena_Allocator *arena, usize size, usize alignment)
+inline void *ArenaPushWithAlignment(Arena_Allocator *arena, usize size, usize alignment)
 {
-  void *res = BumpPushEx(&arena->bump, size, alignment);
+  void *res = BumpPushWithAlignment(&arena->bump, size, alignment);
   if (res == nullptr)
   {
     return nullptr;
@@ -95,7 +95,7 @@ inline void ArenaFree(Arena_Allocator *arena)
 template <typename T>
 [[nodiscard]] inline T *ArenaPush(Arena_Allocator *arena, usize count = 1)
 {
-  void *ptr = ArenaPushEx(arena, sizeof(T) * count, alignof(T));
+  void *ptr = ArenaPushWithAlignment(arena, sizeof(T) * count, alignof(T));
   return static_cast<T *>(ptr);
 }
 
@@ -113,9 +113,9 @@ inline Slice<T> ArenaPushSlice(Arena_Allocator *arena, usize count)
 
 template <typename T>
 [[nodiscard]]
-inline Slice<T> ArenaPushSliceEx(Arena_Allocator *arena, usize count, usize alignment)
+inline Slice<T> ArenaPushSliceWithAlignment(Arena_Allocator *arena, usize count, usize alignment)
 {
-  void *ptr = ArenaPushEx(arena, sizeof(T) * count, Maximum(alignof(T), alignment));
+  void *ptr = ArenaPushWithAlignment(arena, sizeof(T) * count, Maximum(alignof(T), alignment));
   if (ptr == nullptr)
   {
     return {};
