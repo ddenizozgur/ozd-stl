@@ -60,7 +60,7 @@ inline Wait_Result Win32_Wait(Win32_Waitable waitable, u32 timeoutMs = INFINITE,
   return Win32_WaitResultFrom_(result, 1).second;
 }
 
-// wakes for the first one that's signaled
+// returns index of the first one signaled
 [[nodiscard]]
 inline Pair<u32, Wait_Result>
 Win32_WaitAny(Slice<Win32_Waitable> waitables, u32 timeoutMs = INFINITE, Wait_Flags flags = Wait_Flag_None)

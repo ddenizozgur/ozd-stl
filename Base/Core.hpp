@@ -4,16 +4,6 @@
 #include "Types.hpp"
 #include <assert.h>
 
-#if IS_COMPILER_MSVC
-#include <intrin.h>
-#endif
-
-#if IS_COMPILER_MSVC
-#define Trap() __debugbreak()
-#elif IS_COMPILER_CLANG
-#define Trap() __builtin_trap()
-#endif
-
 #if IS_COMPILER_CLANG
 #define PrintfLike(fmtIndex, argsIndex) __attribute__((format(printf, fmtIndex, argsIndex)))
 #else

@@ -27,7 +27,7 @@ inline bool Win32_EnableVisualStyles()
 {
   wchar_t sysDir[MAX_PATH];
   u32 sysDirCount = GetSystemDirectoryW(sysDir, MAX_PATH);
-  if (sysDirCount == 0 || sysDirCount >= MAX_PATH)
+  if (sysDirCount == 0)
   {
     return false;
   }

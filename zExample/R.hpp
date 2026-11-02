@@ -312,14 +312,13 @@ inline void R_HexDump(R_FrameBuffer *frameBuffer, R_BitmapFont font, Vector2<i32
 
       auto addressString = StringFmt(scratch.arena, "%zx:", reinterpret_cast<usize>(bytes));
       R_PutStringAscii(frameBuffer, font, cursor, R_CGA_WHITE, addressString);
-      cursor.x += (addressString.count + 1) * font.glyphSize.width;
+      cursor.x += static_cast<i32>((addressString.count + 1) * font.glyphSize.width);
     }
 
     for (auto i = 0; i < bytesPerRow; i += 1)
     {
       u8 value = bytes[i];
       R_PrintFmtAscii(frameBuffer, font, cursor, value == 0 ? R_CGA_LIGHT_GRAY : R_CGA_WHITE, "%02x", value);
-      // 2 digits and a space
       cursor.x += 3 * font.glyphSize.width;
     }
   }

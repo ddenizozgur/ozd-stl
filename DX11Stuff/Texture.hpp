@@ -1,8 +1,6 @@
 #pragma once
 
-#include "../Base/Math.hpp"
-#include "../Base/Slice.hpp"
-#include "../Win32Stuff/WicImage.hpp"
+#include "../Base/Image.hpp"
 #include "GPU.hpp"
 
 struct DX11_Texture2D
@@ -23,6 +21,7 @@ inline Vector2<u32> DX11_GetTextureSize_(ID3D11View *view)
 }
 
 // pixels are tightly packed rows for uncompressed format
+// TODO: find a better way to handle mips, generateMips uses the immediate context
 [[nodiscard]]
 inline Pair<DX11_Texture2D, bool>
 DX11_CreateTexture2D(DX11_GPU gpu, Slice<u8> pixels, Vector2<u32> size, DXGI_FORMAT format, bool generateMips = false)
@@ -41,7 +40,8 @@ DX11_CreateTexture2D(DX11_GPU gpu, Slice<u8> pixels, Vector2<u32> size, DXGI_FOR
     .Usage = D3D11_USAGE_IMMUTABLE,
     .BindFlags = D3D11_BIND_SHADER_RESOURCE,
   };
-  D3D11_SUBRESOURCE_DATA data = {.pSysMem = pixels.ptr, .SysMemPitch = rowPitch};
+  D3D11_SUBRESOURCE_DATA subresource = {.pSysMem = pixels.ptr, .SysMemPitch = rowPitch};
+  D3D11_SUBRESOURCE_DATA *initialData = &subresource;
   if (generateMips)
   {
     // GenerateMips DRAWS each smaller copy, so the texture needs to be a render target
@@ -49,10 +49,12 @@ DX11_CreateTexture2D(DX11_GPU gpu, Slice<u8> pixels, Vector2<u32> size, DXGI_FOR
     desc.Usage = D3D11_USAGE_DEFAULT;
     desc.BindFlags |= D3D11_BIND_RENDER_TARGET;
     desc.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
+    // level 0 is uploaded after creation
+    initialData = nullptr;
   }
 
   ID3D11Texture2D *texture = nullptr;
-  if (FAILED(gpu.device1->CreateTexture2D(&desc, generateMips ? nullptr : &data, &texture)))
+  if (FAILED(gpu.device1->CreateTexture2D(&desc, initialData, &texture)))
   {
     return {};
   }

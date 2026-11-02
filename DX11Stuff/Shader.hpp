@@ -11,7 +11,8 @@ inline constexpr const char *DX11_COMPUTE_SHADER_TARGET = "cs_5_0";
 
 [[nodiscard]]
 inline Pair<Slice<u8>, bool>
-DX11_CompileShaderFromFile(Arena_Allocator *arena, String path, const char *entry, const char *target,
+DX11_CompileShaderFromFile(Arena_Allocator *arena, String path,
+                           const char *entry, const char *target,
                            Slice<D3D_SHADER_MACRO> defines = {}, bool debug = IS_DEBUG)
 {
   auto scratch = ScratchBegin();

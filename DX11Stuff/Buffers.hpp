@@ -30,10 +30,15 @@ struct DX11_Index_Buffer
 inline ID3D11ShaderResourceView *
 DX11_CreateStructuredView_(DX11_GPU gpu, D3D11_BUFFER_DESC desc, const void *data)
 {
-  D3D11_SUBRESOURCE_DATA initialData = {.pSysMem = data};
+  D3D11_SUBRESOURCE_DATA subresource = {.pSysMem = data};
+  D3D11_SUBRESOURCE_DATA *initialData = nullptr;
+  if (data != nullptr)
+  {
+    initialData = &subresource;
+  }
 
   ID3D11Buffer *buffer = nullptr;
-  if (FAILED(gpu.device1->CreateBuffer(&desc, data != nullptr ? &initialData : nullptr, &buffer)))
+  if (FAILED(gpu.device1->CreateBuffer(&desc, initialData, &buffer)))
   {
     return nullptr;
   }

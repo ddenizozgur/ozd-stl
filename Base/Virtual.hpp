@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Intrinsics.hpp"
 #include "Slice.hpp"
 #include <assert.h>
 

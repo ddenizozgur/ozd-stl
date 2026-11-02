@@ -1,12 +1,9 @@
 #pragma once
 
-//
 // COM must be initialized on the calling thread.
-//
 
 #include "../Base/ArenaAllocator.hpp"
-#include "../Base/Math.hpp"
-#include "../Base/Slice.hpp"
+#include "../Base/Image.hpp"
 #include "Com.hpp"
 
 #define WIN32_LEAN_AND_MEAN
@@ -14,51 +11,12 @@
 #include <wincodec.h>
 #pragma comment(lib, "windowscodecs")
 
-// rows top to bottom with no padding
-using Image_Format = u32;
-enum : Image_Format
-{
-  Image_Format_RGBA8,
-  Image_Format_RGBA8Premultiplied,
-  Image_Format_Gray8,
-  Image_Format_RGBA16,
-  Image_Format_Gray16,
-  Image_Format_RGBA16Float,
-  Image_Format_RGBA32Float,
-};
-
-[[nodiscard]]
-constexpr u32 ImageFormatBytesPerPixel(Image_Format format)
-{
-  switch (format)
-  {
-  case Image_Format_Gray8:
-    return 1;
-  case Image_Format_Gray16:
-    return 2;
-  case Image_Format_RGBA16:
-  case Image_Format_RGBA16Float:
-    return 8;
-  case Image_Format_RGBA32Float:
-    return 16;
-  default:
-    return 4;
-  }
-}
-
 using Image_File_Format = u32;
 enum : Image_File_Format
 {
   Image_File_Format_Png,
   Image_File_Format_Jpeg,
   Image_File_Format_Tiff,
-};
-
-struct Win32_Image
-{
-  Slice<u8> pixels;
-  Vector2<u32> size;
-  Image_Format format;
 };
 
 [[nodiscard]]
@@ -110,13 +68,14 @@ inline IWICImagingFactory *Win32_CreateWicFactory_()
 // Float formats come out linear, the others keep the file's gamma.
 // false when the bytes aren't an image Windows can read.
 [[nodiscard]]
-inline Pair<Win32_Image, bool>
+inline Pair<Image, bool>
 Win32_WicDecodeImageAs(Arena_Allocator *arena, Slice<u8> fileBytes, Image_Format destFormat)
 {
+  assert(fileBytes.count <= MAXDWORD && "WIC reads at most 4 GiB from memory");
+
   IWICImagingFactory *factory = Win32_CreateWicFactory_();
   Defer(factory->Release(););
 
-  assert(fileBytes.count <= MAXDWORD && "WIC reads at most 4 GiB from memory");
   IWICStream *stream = nullptr;
   factory->CreateStream(&stream);
   Defer(stream->Release(););
@@ -169,7 +128,7 @@ Win32_WicDecodeImageAs(Arena_Allocator *arena, Slice<u8> fileBytes, Image_Format
 // JPEG drops alpha.
 [[nodiscard]]
 inline Pair<Slice<u8>, bool>
-Win32_WicEncodeImageAs(Arena_Allocator *arena, Win32_Image image, Image_File_Format fileFormat)
+Win32_WicEncodeImageAs(Arena_Allocator *arena, Image image, Image_File_Format fileFormat)
 {
   IWICImagingFactory *factory = Win32_CreateWicFactory_();
   Defer(factory->Release(););

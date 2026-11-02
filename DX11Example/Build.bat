@@ -25,7 +25,7 @@ if %compiler%==cl goto cl
 set compileFlags=-std=c++20
 set "compileFlags=%compileFlags% -fno-exceptions"
 set "compileFlags=%compileFlags% -fno-rtti"
-set "compileFlags=%compileFlags% -msse4.1"         & rem floorf/ceilf/roundf become one roundss instruction
+set "compileFlags=%compileFlags% -msse4.2"         & rem floorf/ceilf/roundf become one roundss instruction, also enables popcnt
 if %release%==0 set "compileFlags=%compileFlags% -fstack-protector-strong"
 set "compileFlags=%compileFlags% -Wall"
 set "compileFlags=%compileFlags% -Wshorten-64-to-32"
