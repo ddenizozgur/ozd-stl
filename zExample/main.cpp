@@ -35,7 +35,7 @@ void UpdateTitle(HWND hWnd, f32 frameTime)
   frameCounter += 1;
 }
 
-void R_FillRectAntialiased(R_FrameBuffer *frameBuffer, Vector2<f32> position, Vector2<f32> size, R_B8G8R8A8 color)
+void FillRectAntialiased(R_FrameBuffer *frameBuffer, Vector2<f32> position, Vector2<f32> size, R_B8G8R8A8 color)
 {
   auto bottomRight = position + size;
   i32 left = Maximum(0, static_cast<i32>(FloorF32(position.x)));
@@ -59,6 +59,23 @@ void R_FillRectAntialiased(R_FrameBuffer *frameBuffer, Vector2<f32> position, Ve
       {
         R_BlendPixelUnsafe(frameBuffer, {x, y}, color, coverage);
       }
+    }
+  }
+}
+
+inline void SpitSomeGlypsUtf8(R_FrameBuffer *frameBuffer, R_UnicodeFont font, R_B8G8R8A8 color)
+{
+  i32 columns = frameBuffer->size.width / font.glyphSize.width;
+  i32 rows = frameBuffer->size.height / font.glyphSize.height;
+  usize glyph = 0;
+  for (i32 y = 0; y < rows; y += 1)
+  {
+    for (i32 x = 0; x < columns; x += 1)
+    {
+      Rune rune = font.sortedRunes[glyph % font.sortedRunes.count];
+      Vector2<i32> cell = {x * font.glyphSize.width, y * font.glyphSize.height};
+      R_PutRune(frameBuffer, font, cell, color, rune);
+      glyph += 1;
     }
   }
 }
@@ -121,24 +138,11 @@ int main()
       R_Clear(&frameBuffer, {0x44, 0x33, 0x22, 0xff});
       Defer(R_PresentFrameBuffer(hWnd, hDC, frameBuffer););
 
+      SpitSomeGlypsUtf8(&frameBuffer, R_FONT_TER_U14N, R_GRAY);
+
       position += {20 * frameTime, 16 * frameTime};
       R_FillRect(&frameBuffer, R_PositionFrom(position), {32 * 2, 24 * 2}, R_CGA_LIGHT_RED);
-      R_FillRectAntialiased(&frameBuffer, position + Vector2<f32>{0, 40 * 2}, {32 * 2, 24 * 2}, R_CGA_LIGHT_RED);
-
-      auto font = R_FONT_UNIFONT;
-      i32 columns = frameBuffer.size.width / font.glyphSize.width;
-      i32 rows = frameBuffer.size.height / font.glyphSize.height;
-      usize glyph = 0;
-      for (i32 y = 0; y < rows; y += 1)
-      {
-        for (i32 x = 0; x < columns; x += 1)
-        {
-          Rune rune = font.sortedRunes[glyph % font.sortedRunes.count];
-          Vector2<i32> cell = {x * font.glyphSize.width, y * font.glyphSize.height};
-          R_PutRune(&frameBuffer, font, cell, R_CGA_YELLOW, rune);
-          glyph += 1;
-        }
-      }
+      FillRectAntialiased(&frameBuffer, position + Vector2<f32>{0, 40 * 2}, {32 * 2, 24 * 2}, R_CGA_LIGHT_RED);
     }
 
     // DwmFlush();
