@@ -199,6 +199,34 @@ inline void R_FillRect(R_FrameBuffer *frameBuffer,
   }
 }
 
+void R_FillRectAntialiased(R_FrameBuffer *frameBuffer, Vector2<f32> position, Vector2<f32> size, R_B8G8R8A8 color)
+{
+  auto bottomRight = position + size;
+  i32 left = Maximum(0, static_cast<i32>(FloorF32(position.x)));
+  i32 top = Maximum(0, static_cast<i32>(FloorF32(position.y)));
+  i32 right = Minimum(static_cast<i32>(CeilF32(bottomRight.x)), frameBuffer->size.width);
+  i32 bottom = Minimum(static_cast<i32>(CeilF32(bottomRight.y)), frameBuffer->size.height);
+
+  for (auto y = top; y < bottom; y += 1)
+  {
+    f32 coverageY = Minimum(y + 1.0f, bottomRight.y) - Maximum(static_cast<f32>(y), position.y);
+    for (auto x = left; x < right; x += 1)
+    {
+      f32 coverageX = Minimum(x + 1.0f, bottomRight.x) - Maximum(static_cast<f32>(x), position.x);
+      f32 coverage = coverageX * coverageY;
+      if (coverage >= 1.0f)
+      {
+        auto &pixel = *R_PixelPtrUnsafe(frameBuffer, {x, y});
+        pixel = color;
+      }
+      else
+      {
+        R_BlendPixelUnsafe(frameBuffer, {x, y}, color, coverage);
+      }
+    }
+  }
+}
+
 inline void R_PutGlyph_(R_FrameBuffer *frameBuffer, const u8 *rows, Vector2<i32> glyphSize,
                         Vector2<i32> position, R_B8G8R8A8 color)
 {

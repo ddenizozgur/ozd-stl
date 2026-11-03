@@ -114,7 +114,6 @@ Win32_DWriteCollectionFromFiles(Win32_DWrite dwrite, Slice<String> paths)
   return {Win32_DWriteBuildCollection(dwrite, builder)};
 }
 
-// copies the bytes. fonts that failed to load are skipped.
 [[nodiscard]]
 inline Win32_DWrite_Collection
 Win32_DWriteCollectionFromMemory(Win32_DWrite dwrite, Slice<Slice<u8>> fonts)
