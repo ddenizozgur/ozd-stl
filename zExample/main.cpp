@@ -1,4 +1,5 @@
 #include "../Base/Time.hpp"
+#include "../Win32Stuff/DWrite.hpp"
 #include "../Win32Stuff/TaskDialog.hpp"
 #include "../Win32Stuff/Theme.hpp"
 #include "../Win32Stuff/WindowRelated.hpp"
@@ -80,6 +81,89 @@ inline void SpitSomeGlypsUtf8(R_FrameBuffer *frameBuffer, R_UnicodeFont font, R_
   }
 }
 
+// blends the coverage as is
+void PutGlyphBitmap(R_FrameBuffer *frameBuffer, Glyph_Grayscale glyph, Vector2<i32> pen, R_B8G8R8A8 color)
+{
+  auto topLeft = pen + glyph.offset;
+  i32 width = glyph.size.width;
+  i32 height = glyph.size.height;
+  i32 left = Maximum(0, -topLeft.x);
+  i32 top = Maximum(0, -topLeft.y);
+  i32 right = Minimum(width, frameBuffer->size.width - topLeft.x);
+  i32 bottom = Minimum(height, frameBuffer->size.height - topLeft.y);
+
+  for (auto y = top; y < bottom; y += 1)
+  {
+    for (auto x = left; x < right; x += 1)
+    {
+      u8 coverage = glyph.coverage[static_cast<usize>(y) * width + x];
+      if (coverage != 0)
+      {
+        R_BlendPixelUnsafe(frameBuffer, topLeft + Vector2<i32>{x, y}, color, coverage / 255.0f);
+      }
+    }
+  }
+}
+
+Vector2<f32> PutStringUtf8(R_FrameBuffer *frameBuffer, Win32_DWrite dwrite,
+                           Vector2<f32> pen, f32 fontSize, R_B8G8R8A8 color,
+                           Win32_DWrite_Font font, String text, bool codeLigatures = false)
+{
+  auto scratch = ScratchBegin();
+  Defer(ScratchEnd(scratch););
+
+  for (auto shaped : Win32_DWriteShapeText(scratch.arena, dwrite, font, fontSize, text, codeLigatures))
+  {
+    auto [glyph, glyphOk] = Win32_DWriteRasterizeGlyph(scratch.arena, dwrite, font, fontSize, shaped.index);
+    PutGlyphBitmap(frameBuffer, glyph, R_PositionFrom(pen + shaped.offset), color);
+    pen.x += RoundHalfDownF32(shaped.advance);
+  }
+  return pen;
+}
+
+// blends with the user's gamma and contrast
+void PutGlyphBitmapGammaCorrected(R_FrameBuffer *frameBuffer, Glyph_Grayscale glyph, Vector2<i32> pen,
+                                  R_B8G8R8A8 color, const Win32_DWrite_Blend_Table_For_Cpu *blendTable)
+{
+  auto topLeft = pen + glyph.offset;
+  i32 width = glyph.size.width;
+  i32 height = glyph.size.height;
+  i32 left = Maximum(0, -topLeft.x);
+  i32 top = Maximum(0, -topLeft.y);
+  i32 right = Minimum(width, frameBuffer->size.width - topLeft.x);
+  i32 bottom = Minimum(height, frameBuffer->size.height - topLeft.y);
+
+  for (auto y = top; y < bottom; y += 1)
+  {
+    for (auto x = left; x < right; x += 1)
+    {
+      u8 coverage = glyph.coverage[static_cast<usize>(y) * width + x];
+      if (coverage != 0)
+      {
+        R_BlendPixelUnsafe(frameBuffer, topLeft + Vector2<i32>{x, y}, color, blendTable->alphas[coverage]);
+      }
+    }
+  }
+}
+
+Vector2<f32> PutStringUtf8GammaCorrected(R_FrameBuffer *frameBuffer, Win32_DWrite dwrite,
+                                         Win32_DWrite_Blend_Params blendParams,
+                                         Vector2<f32> pen, f32 fontSize, R_B8G8R8A8 color,
+                                         Win32_DWrite_Font font, String text, bool codeLigatures = false)
+{
+  auto scratch = ScratchBegin();
+  Defer(ScratchEnd(scratch););
+
+  auto blendTable = Win32_DWriteBlendTableForCpu(blendParams, {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f});
+  for (auto shaped : Win32_DWriteShapeText(scratch.arena, dwrite, font, fontSize, text, codeLigatures))
+  {
+    auto [glyph, glyphOk] = Win32_DWriteRasterizeGlyph(scratch.arena, dwrite, font, fontSize, shaped.index);
+    PutGlyphBitmapGammaCorrected(frameBuffer, glyph, R_PositionFrom(pen + shaped.offset), color, &blendTable);
+    pen.x += RoundHalfDownF32(shaped.advance);
+  }
+  return pen;
+}
+
 inline auto WIN32_NON_UNICODE_CURSOR_ARROW = MAKEINTRESOURCEA(32512);
 
 int main()
@@ -99,8 +183,8 @@ int main()
   DWORD dwStyle = WS_OVERLAPPEDWINDOW;
   DWORD dwExStyle = 0;
 
-  Vector2<i32> frameBufferSize = {720, 480};
-  RECT wndRect = {0, 0, frameBufferSize.x * 2, frameBufferSize.y * 2};
+  Vector2<i32> frameBufferSize = {1600, 900};
+  RECT wndRect = {0, 0, frameBufferSize.x, frameBufferSize.y};
   AdjustWindowRectExForDpi(&wndRect, dwStyle, false, dwExStyle, g.dpi);
 
   auto hWnd = CreateWindowExW(dwExStyle, wndClass.lpszClassName, L"SomeApp", dwStyle,
@@ -113,10 +197,19 @@ int main()
   auto arena = ArenaInit();
   auto frameBuffer = R_CreateFrameBuffer(&arena, frameBufferSize);
 
+  auto dwrite = Win32_CreateDWrite();
+  auto blendParams = Win32_DWriteBlendParams(dwrite);
+  auto systemFonts = Win32_DWriteCollectionFromSystem(dwrite);
+  auto [font, fontOk] = Win32_DWriteFontFromCollection(systemFonts, StringLit("Consolas"), 400);
+  Defer(Win32_DWriteReleaseFont(&font);
+        Win32_DWriteReleaseCollection(dwrite, &systemFonts);
+        Win32_ReleaseDWrite(&dwrite););
+
+  f32 pixelSize = 16;
+  auto fontMetrics = Win32_DWriteFontMetrics(font, pixelSize);
+
   auto timeNow = Win32_NowNanoseconds();
   auto timeLast = timeNow;
-
-  Vector2<f32> position{};
 
   for (; !g.shouldClose;)
   {
@@ -138,11 +231,10 @@ int main()
       R_Clear(&frameBuffer, {0x44, 0x33, 0x22, 0xff});
       Defer(R_PresentFrameBuffer(hWnd, hDC, frameBuffer););
 
-      SpitSomeGlypsUtf8(&frameBuffer, R_FONT_TER_U14N, R_GRAY);
-
-      position += {20 * frameTime, 16 * frameTime};
-      R_FillRect(&frameBuffer, R_PositionFrom(position), {32 * 2, 24 * 2}, R_CGA_LIGHT_RED);
-      FillRectAntialiased(&frameBuffer, position + Vector2<f32>{0, 40 * 2}, {32 * 2, 24 * 2}, R_CGA_LIGHT_RED);
+      PutStringUtf8GammaCorrected(&frameBuffer, dwrite, blendParams, {0, fontMetrics.ascent}, 16, R_WHITE,
+                                  font, StringLit("DirectWrite: Hello, ğüşıöç ÆØÅ 12345 | Gamma Corrected"));
+      PutStringUtf8(&frameBuffer, dwrite, {0, fontMetrics.ascent + fontMetrics.lineHeight}, 16, R_WHITE,
+                    font, StringLit("DirectWrite: Hello, ğüşıöç ÆØÅ 12345"));
     }
 
     // DwmFlush();

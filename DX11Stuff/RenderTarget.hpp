@@ -154,14 +154,14 @@ inline void DX11_SetRenderTargets(DX11_GPU gpu,
 //
 // Clear
 //
-inline void DX11_ClearRenderTarget(DX11_GPU gpu, DX11_Render_Target target, const f32 (&color)[4])
+inline void DX11_ClearRenderTarget(DX11_GPU gpu, DX11_Render_Target target, Vector4<f32> color)
 {
-  gpu.immediateContext1->ClearRenderTargetView(target.renderView, color);
+  gpu.immediateContext1->ClearRenderTargetView(target.renderView, color.data);
 }
 
-inline void DX11_ClearBackbuffer(DX11_GPU gpu, DX11_Swapchain swapchain, const f32 (&color)[4])
+inline void DX11_ClearBackbuffer(DX11_GPU gpu, DX11_Swapchain swapchain, Vector4<f32> color)
 {
-  gpu.immediateContext1->ClearRenderTargetView(swapchain.backbufferView, color);
+  gpu.immediateContext1->ClearRenderTargetView(swapchain.backbufferView, color.data);
 }
 
 inline void DX11_ClearDepthTarget(DX11_GPU gpu, DX11_Depth_Target target, f32 depth = 1)

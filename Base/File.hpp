@@ -7,7 +7,6 @@
 // Windows 8+, the loader's full path of a module.
 // Same as GetModuleFileNameW, but returns failure as NTSTATUS, GetLastError() might be stale.
 extern "C" __declspec(dllimport) NTSTATUS NTAPI LdrGetDllFullName(PVOID DllHandle, PUNICODE_STRING FullDllName);
-// from ntstatus.h
 inline constexpr NTSTATUS WIN32_STATUS_BUFFER_TOO_SMALL = 0xC0000023;
 
 inline constexpr usize WIN32_FILE_IO_CHUNK_SIZE = Megabytes(32);

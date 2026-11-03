@@ -35,6 +35,21 @@ template <typename T>
 [[nodiscard]] constexpr T Minimum(T a, T b) { return a < b ? a : b; }
 template <typename T>
 [[nodiscard]] constexpr T Maximum(T a, T b) { return a > b ? a : b; }
+template <typename T>
+[[nodiscard]] constexpr T Minimum3(T a, T b, T c) { return Minimum(Minimum(a, b), c); }
+template <typename T>
+[[nodiscard]] constexpr T Maximum3(T a, T b, T c) { return Maximum(Maximum(a, b), c); }
+
+template <typename T>
+[[nodiscard]]
+constexpr T Clamp(T x, T low, T high)
+{
+  assert(low <= high && "clamp range is reversed");
+  return Minimum(Maximum(x, low), high);
+}
+
+template <typename T, usize N>
+[[nodiscard]] constexpr usize ArrayCount(const T (&)[N]) { return N; }
 
 [[nodiscard]] constexpr bool IsPow2(usize x) { return (x != 0) && !(x & (x - 1)); }
 [[nodiscard]] constexpr bool IsPow2OrZero(usize x) { return !(x & (x - 1)); }

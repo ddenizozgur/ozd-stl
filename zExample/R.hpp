@@ -145,7 +145,7 @@ inline void R_BlendPixelUnsafe(R_FrameBuffer *frameBuffer, Vector2<i32> position
   for (auto i = 0; i < 4; i += 1)
   {
     f32 blended = LerpF32(pixel.data[i], color.data[i], coverage);
-    pixel.data[i] = RoundF32(blended);
+    pixel.data[i] = RoundHalfUpF32(blended);
   }
 }
 
