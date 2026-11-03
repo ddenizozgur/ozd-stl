@@ -1,5 +1,6 @@
 #include "../Base/File.hpp"
 #include "../Base/Math.hpp"
+#include "../Base/Random.hpp"
 #include "../Base/Time.hpp"
 #include "../DX11Stuff/Buffers.hpp"
 #include "../DX11Stuff/Presets.hpp"
@@ -20,25 +21,6 @@ struct Example_Globals
   Vector2<u32> clientSize = {};
 };
 inline Example_Globals g;
-
-inline constexpr Vector4<u8> PALETTE_PICO8[] = {
-  {0x1d, 0x2b, 0x53, 0xff},
-  {0x7e, 0x25, 0x53, 0xff},
-  {0x00, 0x87, 0x51, 0xff},
-  {0xab, 0x52, 0x36, 0xff},
-  {0x5f, 0x57, 0x4f, 0xff},
-  {0xc2, 0xc3, 0xc7, 0xff},
-  {0xff, 0xf1, 0xe8, 0xff},
-  {0xff, 0x00, 0x4d, 0xff},
-  {0xff, 0xa3, 0x00, 0xff},
-  {0xff, 0xec, 0x27, 0xff},
-  {0x00, 0xe4, 0x36, 0xff},
-  {0x29, 0xad, 0xff, 0xff},
-  {0x83, 0x76, 0x9c, 0xff},
-  {0xff, 0x77, 0xa8, 0xff},
-  {0xff, 0xcc, 0xaa, 0xff},
-  {0x00, 0x00, 0x00, 0xff},
-};
 
 inline constexpr Vector4<u8> PALETTE_VINIK24[] = {
   {0x6f, 0x67, 0x76, 0xff},
@@ -67,21 +49,6 @@ inline constexpr Vector4<u8> PALETTE_VINIK24[] = {
   {0x00, 0x00, 0x00, 0xff},
 };
 
-inline constexpr Vector4<u8> PALETTE_WOODBLOCK[] = {
-  {0x2b, 0x28, 0x21, 0xff},
-  {0x62, 0x4c, 0x3c, 0xff},
-  {0xd9, 0xac, 0x8b, 0xff},
-  {0xe3, 0xcf, 0xb4, 0xff},
-  {0x24, 0x3d, 0x5c, 0xff},
-  {0x5d, 0x72, 0x75, 0xff},
-  {0x5c, 0x8b, 0x93, 0xff},
-  {0xb1, 0xa5, 0x8d, 0xff},
-  {0xb0, 0x3a, 0x48, 0xff},
-  {0xd4, 0x80, 0x4d, 0xff},
-  {0xe0, 0xc8, 0x72, 0xff},
-  {0x3e, 0x69, 0x58, 0xff},
-};
-
 inline LRESULT CALLBACK ExampleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
 
 void UpdateTitle(HWND hWnd, f32 frameTime)
@@ -107,79 +74,27 @@ void UpdateTitle(HWND hWnd, f32 frameTime)
 }
 
 [[nodiscard]]
-String GenerateChronicle(Arena_Allocator *arena, usize sentenceCount, u32 seed)
+String WallLine(Arena_Allocator *arena, u64 lineIndex, usize maxChars)
 {
-  const char *SUBJECTS[] = {"The grey wanderer", "An old king of the hills", "The folk of the western wood",
-                            "A weary ranger", "The last of the wardens", "The dwarf-lord", "A shadow out of the east",
-                            "The river-maidens", "The heir of the fallen house", "A small and quiet hobbit"};
-  const char *VERBS[] = {"walked beneath", "sang of", "remembered", "sought in vain", "forsook",
-                         "kept watch over", "wept for", "rode toward", "dreamed of", "spoke no word of"};
-  const char *ADJECTIVES[] = {"forgotten", "silver", "ancient", "starlit", "fallen",
-                              "nameless", "mist-covered", "golden", "shadowed", "long-lost"};
-  const char *NOUNS[] = {"halls", "towers", "mountains", "rivers", "kingdoms",
-                         "songs", "stars", "gates", "forests", "barrows"};
-  const char *ENDINGS[] = {"of the elder days", "beyond the sea", "under the mountain", "in the long dark",
-                           "before the sun was young", "when the moon was new", "far in the north",
-                           "and the road went ever on", "while the last light faded", "and was not seen again"};
+  const char *GREETINGS[] = {"Merhaba", "Grüß Gott", "Bonjour", "¡Hola!", "Olá", "Cześć", "Dobrý den", "Szia",
+                             "Bună ziua", "Hallå", "Tere", "Labas", "Sveiki", "Dobar dan", "Xin chào",
+                             "Γειά σου", "Καλημέρα", "Привет", "Здравствуйте", "Добрий день", "Сайн уу",
+                             "こんにちは", "ありがとう", "你好", "谢谢", "早上好"};
 
-  u32 state = seed;
-  auto pick = [&state](Slice<const char *> words)
+  auto random = RandomInit(lineIndex);
+  auto line = FixedListInit(ArenaPushSlice<char>(arena, maxChars));
+  for (;;)
   {
-    state ^= state << 13;
-    state ^= state >> 17;
-    state ^= state << 5;
-    return StringFromC(words[state % words.count]);
-  };
-
-  auto text = FixedListInit(ArenaPushSlice<char>(arena, sentenceCount * 128));
-  for (usize i = 0; i < sentenceCount; i += 1)
-  {
-    String parts[] = {
-      pick(SliceFromArray(SUBJECTS)),
-      StringLit(" "),
-      pick(SliceFromArray(VERBS)),
-      StringLit(" "),
-      pick(SliceFromArray(ADJECTIVES)),
-      StringLit(" "),
-      pick(SliceFromArray(NOUNS)),
-      StringLit(" "),
-      pick(SliceFromArray(ENDINGS)),
-      StringLit(". "),
-    };
-    for (auto part : parts)
+    auto wordIndex = RandomBelowU32(&random, static_cast<u32>(ArrayCount(GREETINGS)));
+    String word = StringFromC(GREETINGS[wordIndex]);
+    if (line.count + word.count + 1 > maxChars)
     {
-      FixedListAppend(&text, part);
+      break;
     }
+    FixedListAppend(&line, word);
+    FixedListAppend(&line, StringLit(" "));
   }
-  return SliceFromFixedList(text);
-}
-
-void WrapLines(Fixed_List<String> *lines, String text, usize maxChars)
-{
-  FixedListClear(lines);
-  usize start = 0;
-  for (; start < text.count && lines->count < lines->backingBuffer.count;)
-  {
-    usize end = Minimum(start + maxChars, text.count);
-    if (end < text.count)
-    {
-      usize space = end;
-      for (; space > start && text[space] != ' '; space -= 1)
-      {
-      }
-      if (space > start)
-      {
-        end = space;
-      }
-    }
-    String line = SliceFromRange(text, start, end);
-    FixedListAppend(lines, {&line, 1});
-
-    start = end;
-    for (; start < text.count && text[start] == ' '; start += 1)
-    {
-    }
-  }
+  return SliceFromFixedList(line);
 }
 
 inline auto WIN32_NON_UNICODE_CURSOR_ARROW = MAKEINTRESOURCEA(32512);
@@ -249,7 +164,7 @@ int main()
   auto dwrite = Win32_CreateDWrite();
   auto blendParams = Win32_DWriteBlendParams(dwrite);
   auto systemFonts = Win32_DWriteCollectionFromSystem(dwrite);
-  auto [font, fontOk] = Win32_DWriteFontFromCollection(systemFonts, StringLit("Consolas"));
+  auto [font, fontOk] = Win32_DWriteFontFromCollection(systemFonts, StringLit("Microsoft YaHei"));
   auto [atlas, atlasOk] = GlyphAtlasInit(&arena, {1024, 1024});
   auto [atlasTexture, atlasTextureOk] = DX11_CreateTexture2D(gpu, atlas.coverage, atlas.size, DXGI_FORMAT_R8_UNORM, false, true);
   Defer(DX11_ReleaseTexture2D(&atlasTexture);
@@ -264,12 +179,9 @@ int main()
     auto scratch = ScratchBegin();
     Defer(ScratchEnd(scratch););
 
-    auto shapedGlyph = Win32_DWriteShapeText(scratch.arena, dwrite, font, pixelSize, StringLit("M"));
+    auto shapedGlyph = Win32_DWriteShapeText(scratch.arena, dwrite, font, pixelSize, StringLit("B"));
     charAdvance = RoundHalfDownF32(shapedGlyph[0].advance);
   }
-  auto wallText = GenerateChronicle(&arena, 400, 0xE1F);
-  auto wallLines = FixedListInit(ArenaPushSlice<String>(&arena, 4096));
-  usize wrappedCharsPerLine = 0;
 
   ShowWindow(hWnd, SW_SHOWMAXIMIZED);
   auto timeStart = Win32_NowNanoseconds();
@@ -320,14 +232,8 @@ int main()
 
       Vector2<f32> screenSize = constantsUI.screenSize;
 
-      // a wall of nonsense scrolling up behind the image
       f32 margin = 16;
       auto charsPerLine = static_cast<usize>((screenSize.width - margin * 2) / charAdvance);
-      if (charsPerLine != wrappedCharsPerLine)
-      {
-        WrapLines(&wallLines, wallText, charsPerLine);
-        wrappedCharsPerLine = charsPerLine;
-      }
 
       f32 scroll = time * 30;
       auto firstLine = static_cast<usize>(scroll / fontMetrics.lineHeightRounded);
@@ -335,7 +241,7 @@ int main()
       auto visibleLines = static_cast<usize>(screenSize.height / fontMetrics.lineHeightRounded) + 2;
       for (usize i = 0; i < visibleLines; i += 1)
       {
-        String line = wallLines[(firstLine + i) % wallLines.count];
+        String line = WallLine(scratch.arena, firstLine + i, charsPerLine);
         Vector4<u8> color = PALETTE_VINIK24[(firstLine + i) % ArrayCount(PALETTE_VINIK24)];
         Vector2<f32> pen = {margin, fontMetrics.ascent + i * fontMetrics.lineHeightRounded - lineOffset};
         UI_PushText(gpu, &uiBatch, &atlas, atlasTexture, dwrite, pen, font, pixelSize, color, line);

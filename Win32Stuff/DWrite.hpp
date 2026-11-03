@@ -34,7 +34,7 @@ struct Font_Metrics
   f32 ascent;
   f32 descent;
   f32 lineGap;
-  f32 lineHeightRounded; // ascent + descent + lineGap, whole pixels so stacked lines snap together
+  f32 lineHeightRounded; // ascent + descent + lineGap, in whole pixels so stacked lines snap together
 };
 
 struct Shaped_Glyph
@@ -263,13 +263,12 @@ inline u16 Win32_DWriteGlyphIndex(Win32_DWrite_Font font, Rune rune)
 // NOTE: scripts like Arabic and Devanagari not supported *yet*.
 [[nodiscard]]
 inline Slice<Shaped_Glyph>
-Win32_DWriteShapeText(Arena_Allocator *arena, Win32_DWrite dwrite, Win32_DWrite_Font font,
-                      f32 pixelSize, String text, bool codeLigatures = false)
+Win32_DWriteShapeText16(Arena_Allocator *arena, Win32_DWrite dwrite, Win32_DWrite_Font font,
+                        f32 pixelSize, String16 text16, bool codeLigatures = false)
 {
   auto scratch = ScratchBegin();
   Defer(ScratchEnd(scratch, IsScratch(arena)););
 
-  auto text16 = Win32_String16From(scratch.arena, text);
   auto textLength = static_cast<u32>(text16.count);
   if (textLength == 0)
   {
@@ -324,6 +323,19 @@ Win32_DWriteShapeText(Arena_Allocator *arena, Win32_DWrite dwrite, Win32_DWrite_
     shaped[i] = {glyphs[i], advances[i], {offsets[i].advanceOffset, -offsets[i].ascenderOffset}};
   }
   return shaped;
+}
+
+// NOTE: scripts like Arabic and Devanagari not supported *yet*.
+[[nodiscard]]
+inline Slice<Shaped_Glyph>
+Win32_DWriteShapeText(Arena_Allocator *arena, Win32_DWrite dwrite, Win32_DWrite_Font font,
+                      f32 pixelSize, String text, bool codeLigatures = false)
+{
+  auto scratch = ScratchBegin();
+  Defer(ScratchEnd(scratch, IsScratch(arena)););
+
+  auto text16 = Win32_String16From(scratch.arena, text);
+  return Win32_DWriteShapeText16(arena, dwrite, font, pixelSize, text16, codeLigatures);
 }
 
 // grayscale antialiased, the coverage has no gamma or contrast applied.

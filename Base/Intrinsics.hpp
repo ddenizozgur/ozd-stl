@@ -86,6 +86,16 @@ inline u32 CountSetBits64(u64 x)
 #endif
 }
 
+[[nodiscard]]
+inline u64 RotateLeft64(u64 x, u32 count)
+{
+#if IS_COMPILER_MSVC
+  return _rotl64(x, static_cast<i32>(count));
+#else
+  return __builtin_rotateleft64(x, count);
+#endif
+}
+
 // floor(log2(x))
 [[nodiscard]]
 inline u32 HighestSetBitIndex(u64 x)
