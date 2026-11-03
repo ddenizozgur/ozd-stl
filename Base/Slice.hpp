@@ -74,13 +74,6 @@ inline usize SliceCopyInto(Slice<T> destination, Slice<T> source)
   return count;
 }
 
-template <typename T>
-constexpr void SliceUnorderedRemove(Slice<T> *slice, usize index)
-{
-  (*slice)[index] = (*slice)[slice->count - 1];
-  slice->count -= 1;
-}
-
 // slice must be sorted. when not found, returns the index of where would it belong
 template <typename T>
 [[nodiscard]]

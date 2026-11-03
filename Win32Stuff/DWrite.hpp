@@ -34,7 +34,7 @@ struct Font_Metrics
   f32 ascent;
   f32 descent;
   f32 lineGap;
-  f32 lineHeight; // ascent + descent + lineGap
+  f32 lineHeightRounded; // ascent + descent + lineGap, whole pixels so stacked lines snap together
 };
 
 struct Shaped_Glyph
@@ -248,7 +248,7 @@ inline Font_Metrics Win32_DWriteFontMetrics(Win32_DWrite_Font font, f32 pixelSiz
   f32 ascent = metrics.ascent * scale;
   f32 descent = metrics.descent * scale;
   f32 lineGap = metrics.lineGap * scale;
-  return {ascent, descent, lineGap, ascent + descent + lineGap};
+  return {ascent, descent, lineGap, RoundHalfDownF32(ascent + descent + lineGap)};
 }
 
 // 0 is the font's missing glyph

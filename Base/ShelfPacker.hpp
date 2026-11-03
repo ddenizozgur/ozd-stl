@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ArenaAllocator.hpp"
+#include "FixedList.hpp"
 #include "Math.hpp"
 
 inline constexpr u32 SHELF_HEIGHT_STEP = 8;
@@ -15,8 +16,7 @@ struct Shelf
 struct Shelf_Packer
 {
   Vector2<u32> size;
-  Slice<Shelf> shelfStorage;
-  u32 usedShelfCount;
+  Fixed_List<Shelf> shelves;
   u32 nextShelfY;
 };
 
@@ -24,12 +24,12 @@ struct Shelf_Packer
 inline Shelf_Packer ShelfPackerInit(Arena_Allocator *arena, Vector2<u32> size)
 {
   auto shelfStorage = ArenaPushSlice<Shelf>(arena, size.height / SHELF_HEIGHT_STEP);
-  return {.size = size, .shelfStorage = shelfStorage};
+  return {.size = size, .shelves = FixedListInit(shelfStorage)};
 }
 
 inline void ShelfPackerReset(Shelf_Packer *packer)
 {
-  packer->usedShelfCount = 0;
+  FixedListClear(&packer->shelves);
   packer->nextShelfY = 0;
 }
 
@@ -39,7 +39,7 @@ inline Pair<Vector2<u32>, bool> ShelfPackerPlace(Shelf_Packer *packer, Vector2<u
 {
   // the shortest shelf that has room
   Shelf *best = nullptr;
-  for (auto &shelf : SliceFromRange(packer->shelfStorage, 0, packer->usedShelfCount))
+  for (auto &shelf : packer->shelves)
   {
     bool fits = size.width <= packer->size.width - shelf.nextX &&
                 size.height <= shelf.height;
@@ -54,12 +54,12 @@ inline Pair<Vector2<u32>, bool> ShelfPackerPlace(Shelf_Packer *packer, Vector2<u
   bool wasteful = best != nullptr && best->height * 2 > shelfHeight * 3;
   bool roomForShelf = shelfHeight <= packer->size.height - packer->nextShelfY &&
                       size.width <= packer->size.width &&
-                      packer->usedShelfCount < packer->shelfStorage.count;
+                      packer->shelves.count < packer->shelves.backingBuffer.count;
   if ((best == nullptr || wasteful) && roomForShelf)
   {
-    best = &packer->shelfStorage[packer->usedShelfCount];
-    *best = {packer->nextShelfY, shelfHeight, 0};
-    packer->usedShelfCount += 1;
+    Shelf shelf = {packer->nextShelfY, shelfHeight, 0};
+    FixedListAppend(&packer->shelves, {&shelf, 1});
+    best = &packer->shelves[packer->shelves.count - 1];
     packer->nextShelfY += shelfHeight;
   }
   if (best == nullptr)

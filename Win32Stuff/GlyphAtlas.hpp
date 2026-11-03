@@ -4,7 +4,7 @@
 #include "../Vendor/rapidhash.h"
 #include "DWrite.hpp"
 
-// NOTE: check twice for garbage padding
+// NOTE: check twice for padding
 struct Glyph_Atlas_Key
 {
   IDWriteFontFace2 *face2;
@@ -39,7 +39,7 @@ inline bool GlyphAtlasKeyEqual(Glyph_Atlas_Key left, Glyph_Atlas_Key right)
 #define CMPR_FN GlyphAtlasKeyEqual
 #include "../Vendor/verstable.h"
 
-// NOTE: filtered sampling *might* need 1 to keep neighbors from bleeding in.
+// TODO: filtered sampling *might* need 1 to keep neighbors from bleeding in.
 inline constexpr u32 GLYPH_ATLAS_PADDING = 0;
 
 struct Glyph_Atlas
@@ -48,6 +48,9 @@ struct Glyph_Atlas
   Vector2<u32> size;
   Shelf_Packer packer;
   Glyph_Atlas_Slots slots;
+  Vector2<u32> dirtyMin;
+  Vector2<u32> dirtyMax;
+  u32 resetCount;
 };
 
 [[nodiscard]]
@@ -64,6 +67,7 @@ inline Pair<Glyph_Atlas, bool> GlyphAtlasInit(Arena_Allocator *arena, Vector2<u3
     .coverage = coverage,
     .size = size,
     .packer = ShelfPackerInit(arena, size),
+    .dirtyMin = size,
   };
   Glyph_Atlas_Slots_init(&atlas.slots);
   return {atlas, true};
@@ -79,7 +83,26 @@ inline void GlyphAtlasReset(Glyph_Atlas *atlas)
 {
   Glyph_Atlas_Slots_clear(&atlas->slots);
   ShelfPackerReset(&atlas->packer);
+  // TODO: do we need memset when if (GLYPH_ATLAS_PADDING == 0) ???
   memset(atlas->coverage.ptr, 0, atlas->coverage.count);
+  atlas->dirtyMin = {0, 0};
+  atlas->dirtyMax = atlas->size;
+  atlas->resetCount += 1;
+}
+
+[[nodiscard]]
+inline Pair<Vector2<u32>, Vector2<u32>> GlyphAtlasTakeDirty(Glyph_Atlas *atlas)
+{
+  Vector2<u32> position = atlas->dirtyMin;
+  Vector2<u32> size = {};
+  if (atlas->dirtyMin.x < atlas->dirtyMax.x &&
+      atlas->dirtyMin.y < atlas->dirtyMax.y)
+  {
+    size = atlas->dirtyMax - atlas->dirtyMin;
+  }
+  atlas->dirtyMin = atlas->size;
+  atlas->dirtyMax = {0, 0};
+  return {position, size};
 }
 
 // false when the glyph is bigger than the whole atlas.
@@ -124,6 +147,9 @@ Win32_DWriteGlyphFromAtlas(Glyph_Atlas *atlas, Win32_DWrite dwrite, Win32_DWrite
       auto row = static_cast<usize>(slot.position.y + y) * atlas->size.width + slot.position.x;
       memcpy(&atlas->coverage[row], &glyph.coverage[static_cast<usize>(y) * glyph.size.width], glyph.size.width);
     }
+    auto end = slot.position + glyph.size;
+    atlas->dirtyMin = {Minimum(atlas->dirtyMin.x, slot.position.x), Minimum(atlas->dirtyMin.y, slot.position.y)};
+    atlas->dirtyMax = {Maximum(atlas->dirtyMax.x, end.x), Maximum(atlas->dirtyMax.y, end.y)};
   }
 
   Glyph_Atlas_Slots_insert(&atlas->slots, key, slot);
