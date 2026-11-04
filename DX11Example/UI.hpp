@@ -82,7 +82,6 @@ inline void UI_PushImage(DX11_GPU gpu, UI_Batch *batch, Vector2<f32> position, V
   UI_Push(gpu, batch, {.position = position, .size = size, .color = color, .kind = UI_Kind_Image});
 }
 
-// sends the atlas area written since the last upload to the GPU
 inline void UI_UploadAtlas(DX11_GPU gpu, Glyph_Atlas *atlas, DX11_Texture2D atlasTexture)
 {
   auto [position, size] = GlyphAtlasTakeDirty(atlas);
@@ -98,12 +97,12 @@ inline void UI_UploadAtlas(DX11_GPU gpu, Glyph_Atlas *atlas, DX11_Texture2D atla
 // pen is on the baseline
 inline Vector2<f32> UI_PushText(DX11_GPU gpu, UI_Batch *batch, Glyph_Atlas *atlas, DX11_Texture2D atlasTexture,
                                 Win32_DWrite dwrite, Vector2<f32> pen, Win32_DWrite_Font font, f32 fontSize,
-                                Vector4<u8> color, String text)
+                                Vector4<u8> color, String text, bool codeLigatures = false)
 {
   auto scratch = ScratchBegin();
   Defer(ScratchEnd(scratch););
 
-  for (auto shaped : Win32_DWriteShapeText(scratch.arena, dwrite, font, fontSize, text))
+  for (auto shaped : Win32_DWriteShapeText(scratch.arena, dwrite, font, fontSize, text, codeLigatures))
   {
     u32 resetCount = atlas->resetCount;
     auto [glyph, glyphOk] = Win32_DWriteGlyphFromAtlas(atlas, dwrite, font, fontSize, shaped.index);

@@ -8,12 +8,17 @@
 
 struct Example_Globals
 {
-  bool shouldClose = false;
-  u32 dpi = USER_DEFAULT_SCREEN_DPI;
+  Win32_Window_State windowState;
+  Win32_Input_State inputState;
 };
 inline Example_Globals g;
 
-inline LRESULT CALLBACK ExampleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+inline LRESULT CALLBACK ExampleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+  Win32_WindowStateOnMessage(&g.windowState, hWnd, message, wParam, lParam);
+  Win32_InputStateOnMessage(&g.inputState, hWnd, message, wParam, lParam);
+  return DefWindowProcW(hWnd, message, wParam, lParam);
+}
 
 void UpdateTitle(HWND hWnd, f32 frameTime)
 {
@@ -121,33 +126,11 @@ Vector2<f32> PutStringDWriteUtf8GammaCorrected(R_FrameBuffer *frameBuffer, Win32
   return pen;
 }
 
-inline auto WIN32_NON_UNICODE_CURSOR_ARROW = MAKEINTRESOURCEA(32512);
-
 int main()
 {
-  // SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-  // Win32_EnableVisualStyles();
-
-  HINSTANCE hInstance = GetModuleHandleW(nullptr);
-
-  WNDCLASSW wndClass = {};
-  wndClass.hInstance = hInstance;
-  wndClass.hCursor = LoadCursorA(nullptr, WIN32_NON_UNICODE_CURSOR_ARROW);
-  wndClass.lpszClassName = L"ExampleClass";
-  wndClass.lpfnWndProc = ExampleWndProc;
-  RegisterClassW(&wndClass);
-
-  DWORD dwStyle = WS_OVERLAPPEDWINDOW;
-  DWORD dwExStyle = 0;
-
   Vector2<i32> frameBufferSize = {1600, 900};
-  RECT wndRect = {0, 0, frameBufferSize.x, frameBufferSize.y};
-  AdjustWindowRectExForDpi(&wndRect, dwStyle, false, dwExStyle, g.dpi);
-
-  auto hWnd = CreateWindowExW(dwExStyle, wndClass.lpszClassName, L"SomeApp", dwStyle,
-                              CW_USEDEFAULT, CW_USEDEFAULT,
-                              wndRect.right - wndRect.left, wndRect.bottom - wndRect.top,
-                              nullptr, nullptr, hInstance, nullptr);
+  auto [classId, classOk] = Win32_RegisterWindowClass(StringLit("ExampleClass"), ExampleWndProc);
+  auto hWnd = Win32_CreateWindow(classId, StringLit("SomeApp"), {1600, 900}, Window_Kind_Normal);
   Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic, true);
   ShowWindow(hWnd, SW_SHOWMAXIMIZED);
 
@@ -179,18 +162,14 @@ int main()
   auto timeNow = Win32_NowNanoseconds();
   auto timeLast = timeNow;
 
-  for (; !g.shouldClose;)
+  for (; !g.windowState.destroyed;)
   {
     timeNow = Win32_NowNanoseconds();
     f32 frameTime = SecondsFromNano(timeNow - timeLast);
     timeLast = timeNow;
     UpdateTitle(hWnd, frameTime);
 
-    for (MSG message; PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE);)
-    {
-      TranslateMessage(&message);
-      DispatchMessageW(&message);
-    }
+    Win32_PollMessages(&g.inputState);
 
     {
       auto hDC = GetDC(hWnd);
@@ -199,62 +178,27 @@ int main()
       R_Clear(&frameBuffer, {0x44, 0x33, 0x22, 0xff});
       Defer(R_PresentFrameBuffer(hWnd, hDC, frameBuffer););
 
+      f32 lineTop = 0;
       for (u32 y = 1; y < 30; y += 1)
       {
         auto scratch = ScratchBegin();
         Defer(ScratchEnd(scratch););
 
         f32 fontSize = y + 8;
+        auto metrics = Win32_DWriteFontMetrics(font, fontSize);
+        f32 correctedBaseline = lineTop + metrics.ascent;
+        f32 plainBaseline = correctedBaseline + metrics.lineHeightRounded;
+        f32 rightHalf = frameBuffer.size.x / 2.0f;
         String text = StringFmt(scratch.arena, "DirectWrite: Hello, ğüşıöç ÆØÅ 12345 | %.2f", fontSize);
-        PutStringDWriteUtf8GammaCorrected(&frameBuffer, dwrite, blendParams, &atlas, {0, fontSize * y * 2}, R_WHITE, font, fontSize, text);
-        PutStringDWriteUtf8(&frameBuffer, dwrite, &atlas, {0, fontSize * (y * 2 + 1)}, R_WHITE, font, fontSize, text);
+        PutStringDWriteUtf8GammaCorrected(&frameBuffer, dwrite, blendParams, &atlas, {0, correctedBaseline}, R_WHITE, font, fontSize, text);
+        PutStringDWriteUtf8(&frameBuffer, dwrite, &atlas, {0, plainBaseline}, R_WHITE, font, fontSize, text);
 
-        PutStringDWriteUtf8GammaCorrected(&frameBuffer, dwrite, blendParams, &atlas, {frameBuffer.size.x / 2.0f, fontSize * y * 2}, R_CGA_YELLOW, font, fontSize, text);
-        PutStringDWriteUtf8(&frameBuffer, dwrite, &atlas, {frameBuffer.size.x / 2.0f, fontSize * (y * 2 + 1)}, R_CGA_YELLOW, font, fontSize, text);
+        PutStringDWriteUtf8GammaCorrected(&frameBuffer, dwrite, blendParams, &atlas, {rightHalf, correctedBaseline}, R_CGA_YELLOW, font, fontSize, text);
+        PutStringDWriteUtf8(&frameBuffer, dwrite, &atlas, {rightHalf, plainBaseline}, R_CGA_YELLOW, font, fontSize, text);
+        lineTop += metrics.lineHeightRounded * 2;
       }
     }
 
     // DwmFlush();
   }
-}
-
-inline LRESULT CALLBACK ExampleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-  LRESULT result = 0;
-  switch (message)
-  {
-  case WM_CREATE:
-    g.dpi = GetDpiForWindow(hWnd);
-    break;
-  case WM_SIZE:
-    break;
-  case WM_ERASEBKGND:
-    result = 1;
-    break;
-  case WM_PAINT:
-  {
-    PAINTSTRUCT paint;
-    BeginPaint(hWnd, &paint);
-    EndPaint(hWnd, &paint);
-    break;
-  }
-  case WM_DPICHANGED:
-  {
-    auto suggested = reinterpret_cast<RECT *>(lParam);
-    SetWindowPos(hWnd, nullptr,
-                 suggested->left, suggested->top,
-                 suggested->right - suggested->left,
-                 suggested->bottom - suggested->top,
-                 SWP_NOZORDER | SWP_NOACTIVATE);
-    g.dpi = HIWORD(wParam);
-    break;
-  }
-  case WM_DESTROY:
-    g.shouldClose = true;
-    break;
-  default:
-    result = DefWindowProcW(hWnd, message, wParam, lParam);
-    break;
-  }
-  return result;
 }

@@ -17,8 +17,8 @@
 
 struct Example_Globals
 {
-  bool shouldClose = false;
-  Vector2<u32> clientSize = {};
+  Win32_Window_State windowState;
+  Win32_Input_State inputState;
 };
 inline Example_Globals g;
 
@@ -49,7 +49,12 @@ inline constexpr Vector4<u8> PALETTE_VINIK24[] = {
   {0x00, 0x00, 0x00, 0xff},
 };
 
-inline LRESULT CALLBACK ExampleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam);
+inline LRESULT CALLBACK ExampleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
+{
+  Win32_WindowStateOnMessage(&g.windowState, hWnd, message, wParam, lParam);
+  Win32_InputStateOnMessage(&g.inputState, hWnd, message, wParam, lParam);
+  return DefWindowProcW(hWnd, message, wParam, lParam);
+}
 
 void UpdateTitle(HWND hWnd, f32 frameTime)
 {
@@ -76,10 +81,10 @@ void UpdateTitle(HWND hWnd, f32 frameTime)
 [[nodiscard]]
 String WallLine(Arena_Allocator *arena, u64 lineIndex, usize maxChars)
 {
+  // JetBrains Mono has Latin, Greek and Cyrillic
   const char *GREETINGS[] = {"Merhaba", "Grüß Gott", "Bonjour", "¡Hola!", "Olá", "Cześć", "Dobrý den", "Szia",
                              "Bună ziua", "Hallå", "Tere", "Labas", "Sveiki", "Dobar dan", "Xin chào",
-                             "Γειά σου", "Καλημέρα", "Привет", "Здравствуйте", "Добрий день", "Сайн уу",
-                             "こんにちは", "ありがとう", "你好", "谢谢", "早上好"};
+                             "Γειά σου", "Καλημέρα", "Привет", "Здравствуйте", "Добрий день", "Сайн уу"};
 
   auto random = RandomInit(lineIndex);
   auto line = FixedListInit(ArenaPushSlice<char>(arena, maxChars));
@@ -97,30 +102,15 @@ String WallLine(Arena_Allocator *arena, u64 lineIndex, usize maxChars)
   return SliceFromFixedList(line);
 }
 
-inline auto WIN32_NON_UNICODE_CURSOR_ARROW = MAKEINTRESOURCEA(32512);
-
 int main()
 {
+  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
   auto com = Win32_InitComOnThread(Com_Apartment_SingleThreaded);
   Defer(Win32_UninitComOnThread(&com););
 
-  HINSTANCE hInstance = GetModuleHandleW(nullptr);
-  WNDCLASSW wndClass = {
-    .lpfnWndProc = ExampleWndProc,
-    .hInstance = hInstance,
-    .hCursor = LoadCursorA(nullptr, WIN32_NON_UNICODE_CURSOR_ARROW),
-    .lpszClassName = L"DX11ExampleClass",
-  };
-  RegisterClassW(&wndClass);
-
-  DWORD dwStyle = WS_OVERLAPPEDWINDOW;
-  DWORD dwExStyle = WS_EX_NOREDIRECTIONBITMAP;
-  RECT wndRect = {0, 0, 1280, 720};
-  AdjustWindowRectEx(&wndRect, dwStyle, false, dwExStyle);
-  auto hWnd = CreateWindowExW(dwExStyle, wndClass.lpszClassName, L"DX11Example", dwStyle,
-                              CW_USEDEFAULT, CW_USEDEFAULT,
-                              wndRect.right - wndRect.left, wndRect.bottom - wndRect.top,
-                              nullptr, nullptr, hInstance, nullptr);
+  auto [classId, classOk] = Win32_RegisterWindowClass(StringLit("DX11ExampleClass"), ExampleWndProc);
+  auto hWnd = Win32_CreateWindow(classId, StringLit("DX11Example"), {1280, 720},
+                                 Window_Kind_Normal, WS_EX_NOREDIRECTIONBITMAP);
   Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic);
 
   auto instance = DX11_CreateInstance();
@@ -132,6 +122,8 @@ int main()
         DX11_ReleaseSwapchain(&swapchain););
 
   auto arena = ArenaInit();
+  g.inputState = Win32_InputStateInitWithTextInput(ArenaPushSlice<char>(&arena, 256));
+
   auto imagePath = Win32_PathFromExe(&arena, StringLit("../Assets/Pattern.png"));
   auto [fileBytes, fileOk] = Win32_ReadEntireFile(&arena, imagePath);
   auto [image, imageOk] = Win32_WicDecodeImageAs(&arena, fileBytes, Image_Format_RGBA8Premultiplied);
@@ -163,45 +155,95 @@ int main()
 
   auto dwrite = Win32_CreateDWrite();
   auto blendParams = Win32_DWriteBlendParams(dwrite);
-  auto systemFonts = Win32_DWriteCollectionFromSystem(dwrite);
-  auto [font, fontOk] = Win32_DWriteFontFromCollection(systemFonts, StringLit("Microsoft YaHei"));
+  String fontPaths[] = {Win32_PathFromExe(&arena, StringLit("../Assets/JetBrainsMono-Regular.ttf"))};
+  auto fontFiles = Win32_DWriteCollectionFromFiles(dwrite, SliceFromArray(fontPaths));
+  auto [font, fontOk] = Win32_DWriteFontFromCollection(fontFiles, StringLit("JetBrains Mono"));
   auto [atlas, atlasOk] = GlyphAtlasInit(&arena, {1024, 1024});
   auto [atlasTexture, atlasTextureOk] = DX11_CreateTexture2D(gpu, atlas.coverage, atlas.size, DXGI_FORMAT_R8_UNORM, false, true);
   Defer(DX11_ReleaseTexture2D(&atlasTexture);
         GlyphAtlasRelease(&atlas);
         Win32_DWriteReleaseFont(&font);
-        Win32_DWriteReleaseCollection(dwrite, &systemFonts);
+        Win32_DWriteReleaseCollection(dwrite, &fontFiles);
         Win32_ReleaseDWrite(&dwrite););
-  f32 pixelSize = 16;
-  auto fontMetrics = Win32_DWriteFontMetrics(font, pixelSize);
-  f32 charAdvance = 0;
-  {
-    auto scratch = ScratchBegin();
-    Defer(ScratchEnd(scratch););
 
-    auto shapedGlyph = Win32_DWriteShapeText(scratch.arena, dwrite, font, pixelSize, StringLit("B"));
-    charAdvance = RoundHalfDownF32(shapedGlyph[0].advance);
-  }
+  f32 basePixelSize = 15;
+  u32 fontDpi = 0;
+  f32 pixelSize = 0;
+  Font_Metrics fontMetrics = {};
+  f32 charAdvance = 0;
+
+  f32 scroll = 0;
+  bool paused = false;
+  auto typed = FixedListInit(ArenaPushSlice<char>(&arena, 256));
+  bool fullscreen = false;
+  Win32_Windowed_Placement windowed = {};
 
   ShowWindow(hWnd, SW_SHOWMAXIMIZED);
-  auto timeStart = Win32_NowNanoseconds();
-  auto timeLast = timeStart;
+  auto timeLast = Win32_NowNanoseconds();
 
-  for (; !g.shouldClose;)
+  for (; !g.windowState.destroyed;)
   {
     auto timeNow = Win32_NowNanoseconds();
     f32 frameTime = SecondsFromNano(timeNow - timeLast);
-    f32 time = SecondsFromNano(timeNow - timeStart);
     timeLast = timeNow;
     UpdateTitle(hWnd, frameTime);
 
     DX11_WaitForBetterLatency(swapchain); // call it before handling input
-    for (MSG message; PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE);)
+    Win32_PollMessages(&g.inputState);
+    DX11_ResizeSwapchain(gpu, &swapchain, g.windowState.clientSize);
+
+    f32 dpiScale = g.windowState.dpi / static_cast<f32>(USER_DEFAULT_SCREEN_DPI);
+    if (g.windowState.dpi != fontDpi)
     {
-      TranslateMessage(&message);
-      DispatchMessageW(&message);
+      fontDpi = g.windowState.dpi;
+      pixelSize = basePixelSize * dpiScale;
+      fontMetrics = Win32_DWriteFontMetrics(font, pixelSize);
+
+      auto scratch = ScratchBegin();
+      Defer(ScratchEnd(scratch););
+
+      auto shapedGlyph = Win32_DWriteShapeText(scratch.arena, dwrite, font, pixelSize, StringLit("B"));
+      charAdvance = RoundHalfDownF32(shapedGlyph[0].advance);
     }
-    DX11_ResizeSwapchain(gpu, &swapchain, g.clientSize);
+
+    if (Win32_KeyPressed(&g.inputState, VK_F11))
+    {
+      fullscreen = !fullscreen;
+      if (fullscreen)
+      {
+        windowed = Win32_EnterFullscreen(hWnd);
+      }
+      else
+      {
+        Win32_ExitFullscreen(hWnd, windowed);
+      }
+    }
+    if (Win32_ButtonPressed(&g.inputState, Mouse_Button_Left))
+    {
+      paused = !paused;
+    }
+    if (!paused)
+    {
+      scroll += frameTime * 30 * dpiScale;
+    }
+    scroll -= g.inputState.wheelDelta.y * 3 * fontMetrics.lineHeightRounded;
+    scroll = Maximum(scroll, 0.0f);
+
+    for (auto decoded : StringRunes(SliceFromFixedList(g.inputState.textWithCtrlChars)))
+    {
+      if (decoded.rune == '\b' && typed.count != 0)
+      {
+        typed.count -= Utf8DecodeRuneBefore(SliceFromFixedList(typed), typed.count).size;
+      }
+      else if (decoded.rune == '\n')
+      {
+        FixedListClear(&typed);
+      }
+      else if (decoded.rune != '\b' && decoded.rune != '\t')
+      {
+        Utf8AppendWholeRune(&typed, decoded.rune);
+      }
+    }
 
     auto swapchainSize = DX11_GetSwapchainSize(swapchain);
     {
@@ -232,18 +274,26 @@ int main()
 
       Vector2<f32> screenSize = constantsUI.screenSize;
 
-      f32 margin = 16;
+      f32 margin = 8 * dpiScale;
+      f32 lineHeight = fontMetrics.lineHeightRounded;
       auto charsPerLine = static_cast<usize>((screenSize.width - margin * 2) / charAdvance);
 
-      f32 scroll = time * 30;
-      auto firstLine = static_cast<usize>(scroll / fontMetrics.lineHeightRounded);
-      f32 lineOffset = scroll - firstLine * fontMetrics.lineHeightRounded;
-      auto visibleLines = static_cast<usize>(screenSize.height / fontMetrics.lineHeightRounded) + 2;
+      auto firstLine = static_cast<usize>(scroll / lineHeight);
+      f32 lineOffset = scroll - firstLine * lineHeight;
+      auto visibleLines = static_cast<usize>(screenSize.height / lineHeight) + 2;
       for (usize i = 0; i < visibleLines; i += 1)
       {
+        f32 lineTop = i * lineHeight - lineOffset;
+        bool hovered = g.inputState.mouseInsideClient &&
+                       g.inputState.mousePosition.y >= lineTop &&
+                       g.inputState.mousePosition.y < lineTop + lineHeight;
+        if (hovered)
+        {
+          UI_PushRect(gpu, &uiBatch, {0, lineTop}, {screenSize.width, lineHeight}, {255, 255, 255, 40});
+        }
         String line = WallLine(scratch.arena, firstLine + i, charsPerLine);
         Vector4<u8> color = PALETTE_VINIK24[(firstLine + i) % ArrayCount(PALETTE_VINIK24)];
-        Vector2<f32> pen = {margin, fontMetrics.ascent + i * fontMetrics.lineHeightRounded - lineOffset};
+        Vector2<f32> pen = {margin, lineTop + fontMetrics.ascent};
         UI_PushText(gpu, &uiBatch, &atlas, atlasTexture, dwrite, pen, font, pixelSize, color, line);
       }
 
@@ -251,28 +301,21 @@ int main()
       Vector2<f32> imageSize = {imageHeight * imageAspect, imageHeight};
       UI_PushImage(gpu, &uiBatch, (screenSize - imageSize) / 2.0f, imageSize);
 
+      f32 barHeight = lineHeight + margin * 2;
+      f32 barTop = screenSize.height - barHeight;
+      UI_PushRect(gpu, &uiBatch, {0, barTop}, {screenSize.width, barHeight}, {0, 0, 0, 200});
+      String prompt = StringFmt(scratch.arena, "> %.*s_", StringArgs(SliceFromFixedList(typed)));
+      if (typed.count == 0)
+      {
+        prompt = StringLit("> type here, F11 fullscreen");
+      }
+      Vector2<f32> promptPen = {margin, barTop + margin + fontMetrics.ascent};
+      UI_PushText(gpu, &uiBatch, &atlas, atlasTexture, dwrite, promptPen, font, pixelSize, {255, 255, 255, 255}, prompt);
+
       UI_Flush(gpu, &uiBatch);
     }
 
     DX11_PresentSwapchain(swapchain, 0);
     DX11_FlushInfoQueue(instance);
   }
-}
-
-inline LRESULT CALLBACK ExampleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-  LRESULT result = 0;
-  switch (message)
-  {
-  case WM_SIZE:
-    g.clientSize = {LOWORD(lParam), HIWORD(lParam)};
-    break;
-  case WM_DESTROY:
-    g.shouldClose = true;
-    break;
-  default:
-    result = DefWindowProcW(hWnd, message, wParam, lParam);
-    break;
-  }
-  return result;
 }
