@@ -82,7 +82,7 @@ struct Win32_Window_Class_Id
 // false when a class with this name is already registered
 [[nodiscard]]
 inline Pair<Win32_Window_Class_Id, bool>
-Win32_RegisterWindowClass(String name, WNDPROC wndProc, HICON icon = nullptr)
+Win32_RegisterWindowClass(String name, WNDPROC wndProc, UINT classStyle = 0, HICON icon = nullptr)
 {
   auto scratch = ScratchBegin();
   Defer(ScratchEnd(scratch););
@@ -91,6 +91,7 @@ Win32_RegisterWindowClass(String name, WNDPROC wndProc, HICON icon = nullptr)
   HINSTANCE hInstance = GetModuleHandleW(nullptr);
   WNDCLASSEXW wndClass = {
     .cbSize = sizeof(wndClass),
+    .style = classStyle,
     .lpfnWndProc = wndProc,
     .hInstance = hInstance,
     .hIcon = icon,
@@ -303,7 +304,7 @@ struct Win32_Input_State
 // a zeroed Win32_Input_State works without text
 [[nodiscard]]
 inline Win32_Input_State
-Win32_InputStateInitWithTextInput(Slice<char> textBuffer)
+Win32_InputStateInitForTextInput(Slice<char> textBuffer)
 {
   return {.textWithCtrlChars = FixedListInit(textBuffer)};
 }

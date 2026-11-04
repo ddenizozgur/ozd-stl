@@ -105,6 +105,7 @@ String WallLine(Arena_Allocator *arena, u64 lineIndex, usize maxChars)
 int main()
 {
   SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+
   auto com = Win32_InitComOnThread(Com_Apartment_SingleThreaded);
   Defer(Win32_UninitComOnThread(&com););
 
@@ -112,6 +113,7 @@ int main()
   auto hWnd = Win32_CreateWindow(classId, StringLit("DX11Example"), {1280, 720},
                                  Window_Kind_Normal, WS_EX_NOREDIRECTIONBITMAP);
   Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic);
+  Win32_SetWindowCorners(hWnd, Window_Corners_RoundSmall);
 
   auto instance = DX11_CreateInstance();
   Defer(DX11_ReleaseInstance(&instance););
@@ -122,7 +124,7 @@ int main()
         DX11_ReleaseSwapchain(&swapchain););
 
   auto arena = ArenaInit();
-  g.inputState = Win32_InputStateInitWithTextInput(ArenaPushSlice<char>(&arena, 256));
+  g.inputState = Win32_InputStateInitForTextInput(ArenaPushSlice<char>(&arena, 256));
 
   auto imagePath = Win32_PathFromExe(&arena, StringLit("../Assets/Pattern.png"));
   auto [fileBytes, fileOk] = Win32_ReadEntireFile(&arena, imagePath);
@@ -157,6 +159,7 @@ int main()
   auto blendParams = Win32_DWriteBlendParams(dwrite);
   String fontPaths[] = {Win32_PathFromExe(&arena, StringLit("../Assets/JetBrainsMono-Regular.ttf"))};
   auto fontFiles = Win32_DWriteCollectionFromFiles(dwrite, SliceFromArray(fontPaths));
+  // auto fontFiles = Win32_DWriteCollectionFromSystem(dwrite);
   auto [font, fontOk] = Win32_DWriteFontFromCollection(fontFiles, StringLit("JetBrains Mono"));
   auto [atlas, atlasOk] = GlyphAtlasInit(&arena, {1024, 1024});
   auto [atlasTexture, atlasTextureOk] = DX11_CreateTexture2D(gpu, atlas.coverage, atlas.size, DXGI_FORMAT_R8_UNORM, false, true);
@@ -164,6 +167,7 @@ int main()
         GlyphAtlasRelease(&atlas);
         Win32_DWriteReleaseFont(&font);
         Win32_DWriteReleaseCollection(dwrite, &fontFiles);
+        // Win32_DWriteReleaseCollection(dwrite, &fontFiles);
         Win32_ReleaseDWrite(&dwrite););
 
   f32 basePixelSize = 15;
@@ -178,7 +182,8 @@ int main()
   bool fullscreen = false;
   Win32_Windowed_Placement windowed = {};
 
-  ShowWindow(hWnd, SW_SHOWMAXIMIZED);
+  // ShowWindow(hWnd, SW_SHOWMAXIMIZED);
+  ShowWindow(hWnd, SW_SHOW);
   auto timeLast = Win32_NowNanoseconds();
 
   for (; !g.windowState.destroyed;)

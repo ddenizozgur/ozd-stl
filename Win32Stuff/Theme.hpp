@@ -26,6 +26,30 @@ inline constexpr DWM_SYSTEMBACKDROP_TYPE WIN32_BACKDROP_TYPES[Window_Backdrop_CO
   DWMSBT_TRANSIENTWINDOW,
 };
 
+using Window_Corners = u32;
+enum : Window_Corners
+{
+  Window_Corners_Default, // Windows decides
+  Window_Corners_Square,
+  Window_Corners_Round,
+  Window_Corners_RoundSmall,
+  Window_Corners_COUNT,
+};
+
+inline constexpr DWM_WINDOW_CORNER_PREFERENCE WIN32_CORNER_PREFERENCES[Window_Corners_COUNT] = {
+  DWMWCP_DEFAULT,
+  DWMWCP_DONOTROUND,
+  DWMWCP_ROUND,
+  DWMWCP_ROUNDSMALL,
+};
+
+// Windows 11
+inline bool Win32_SetWindowCorners(HWND hWnd, Window_Corners corners)
+{
+  DWM_WINDOW_CORNER_PREFERENCE preference = WIN32_CORNER_PREFERENCES[corners];
+  return SUCCEEDED(DwmSetWindowAttribute(hWnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference, sizeof(preference)));
+}
+
 // Backdrops require Windows 11 22H2.
 // Maximized window draws its caption buttons a few pixels too low when backdropBehindClient is set.
 inline bool Win32_SetDarkTheme(HWND hWnd, Window_Backdrop backdrop, bool backdropBehindClient = false)
