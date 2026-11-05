@@ -3,6 +3,7 @@
 // the original implementation is from Odin's core library:
 // https://github.com/odin-lang/Odin/blob/master/core/unicode/utf8/utf8.odin
 
+#include "FixedList.hpp"
 #include "String.hpp"
 
 using Rune = u32;
@@ -183,6 +184,15 @@ inline Utf8_Encoded Utf8EncodeRune(Rune rune)
     res.size = 4;
   }
   return res;
+}
+
+inline void Utf8AppendWholeRune(Fixed_List<char> *text, Rune rune)
+{
+  auto encoded = Utf8EncodeRune(rune);
+  if (text->count + encoded.size <= text->backingBuffer.count)
+  {
+    FixedListAppend(text, {encoded.bytes, encoded.size});
+  }
 }
 
 //

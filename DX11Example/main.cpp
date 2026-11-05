@@ -232,17 +232,19 @@ int main()
 
     for (auto decoded : StringRunes(SliceFromFixedList(g.inputState.textWithCtrlChars)))
     {
-      if (decoded.rune == '\b' && typed.count != 0)
+      switch (decoded.rune)
       {
+      case '\b':
         typed.count -= Utf8DecodeRuneBefore(SliceFromFixedList(typed), typed.count).size;
-      }
-      else if (decoded.rune == '\n')
-      {
+        break;
+      case '\n':
         FixedListClear(&typed);
-      }
-      else if (decoded.rune != '\b' && decoded.rune != '\t')
-      {
+        break;
+      case '\t':
+        break;
+      default:
         Utf8AppendWholeRune(&typed, decoded.rune);
+        break;
       }
     }
 
@@ -338,7 +340,6 @@ int main()
           scroll = 0;
         }
         auto debugHasMouse = Debug_End(&debug);
-
         if (!debugHasMouse && Win32_ButtonPressed(&g.inputState, Mouse_Button_Left))
         {
           paused = !paused;

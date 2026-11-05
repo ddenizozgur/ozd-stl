@@ -1,6 +1,5 @@
 #pragma once
 
-#include "../Base/FixedList.hpp"
 #include "../Base/Math.hpp"
 #include "../Base/String.hpp"
 #include "../Base/Unicode.hpp"
@@ -239,15 +238,6 @@ inline void Win32_SetWindowText(HWND hWnd, String title)
 // Call the OnMessage functions from your own WndProc.
 // They only watch messages, your WndProc still decides what to return.
 // Assumes a Unicode window class (RegisterClassW), so WM_CHAR carries UTF-16.
-
-inline void Utf8AppendWholeRune(Fixed_List<char> *text, Rune rune)
-{
-  auto encoded = Utf8EncodeRune(rune);
-  if (text->count + encoded.size <= text->backingBuffer.count)
-  {
-    FixedListAppend(text, {encoded.bytes, encoded.size});
-  }
-}
 
 struct Key_Bits
 {

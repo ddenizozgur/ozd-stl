@@ -58,10 +58,11 @@ struct Debug_Interaction
 };
 
 inline constexpr f32 DEBUG_PANEL_WIDTH = 300;
-inline constexpr f32 DEBUG_PADDING = 4;
+inline constexpr f32 DEBUG_TEXT_INSET = 4;
+inline constexpr f32 DEBUG_CHECKBOX_INSET = 2;
 inline constexpr f32 DEBUG_ROW_SPACING = 4;
-inline constexpr f32 DEBUG_ROW_INNER = 2;
-inline constexpr f32 DEBUG_CORNER_RADIUS = 4;
+inline constexpr f32 DEBUG_ROW_MARGIN_X = 4;
+inline constexpr f32 DEBUG_CORNER_RADIUS = DEBUG_ROW_MARGIN_X * 2;
 
 inline constexpr Vector4<u8> DEBUG_COLOR_PANEL = {24, 26, 32, 235};
 inline constexpr Vector4<u8> DEBUG_COLOR_TITLE = {44, 48, 60, 255};
@@ -70,6 +71,18 @@ inline constexpr Vector4<u8> DEBUG_COLOR_WIDGET_HOT = {62, 68, 84, 255};
 inline constexpr Vector4<u8> DEBUG_COLOR_WIDGET_ACTIVE = {78, 86, 106, 255};
 inline constexpr Vector4<u8> DEBUG_COLOR_ACCENT = {65, 106, 163, 255};
 inline constexpr Vector4<u8> DEBUG_COLOR_TEXT = {230, 232, 240, 255};
+inline constexpr Vector4<u8> DEBUG_COLOR_BORDER = {78, 86, 106, 255};
+
+/*
+inline constexpr Vector4<u8> DEBUG_COLOR_PANEL = {50, 50, 50, 255};
+inline constexpr Vector4<u8> DEBUG_COLOR_TITLE = {25, 25, 25, 255};
+inline constexpr Vector4<u8> DEBUG_COLOR_WIDGET = {75, 75, 75, 255};
+inline constexpr Vector4<u8> DEBUG_COLOR_WIDGET_HOT = {95, 95, 95, 255};
+inline constexpr Vector4<u8> DEBUG_COLOR_WIDGET_ACTIVE = {115, 115, 115, 255};
+inline constexpr Vector4<u8> DEBUG_COLOR_ACCENT = {220, 140, 40, 255};
+inline constexpr Vector4<u8> DEBUG_COLOR_TEXT = {230, 230, 230, 255};
+inline constexpr Vector4<u8> DEBUG_COLOR_BORDER = {150, 150, 150, 255};
+*/
 
 [[nodiscard]] inline f32 Debug_Px_(const Debug_UI *ui, f32 pixelsAt100)
 {
@@ -78,7 +91,7 @@ inline constexpr Vector4<u8> DEBUG_COLOR_TEXT = {230, 232, 240, 255};
 
 [[nodiscard]] inline f32 Debug_RowHeight_(const Debug_UI *ui)
 {
-  return ui->fontMetrics.lineHeightRounded + Debug_Px_(ui, DEBUG_ROW_INNER) * 2;
+  return ui->fontMetrics.lineHeightRounded;
 }
 
 [[nodiscard]] inline Debug_Widget_Id Debug_IdFromCallSite_(Debug_UI *ui, const void *callSite)
@@ -143,8 +156,7 @@ inline void Debug_Rect_(Debug_UI *ui, Debug_Rect rect, Vector4<u8> color, f32 co
 inline void Debug_Text_(Debug_UI *ui, Vector2<f32> rowPosition, String text)
 {
   auto renderer = &ui->renderer;
-  f32 inner = Debug_Px_(ui, DEBUG_ROW_INNER);
-  Vector2<f32> pen = {rowPosition.x + inner * 2, rowPosition.y + inner + ui->fontMetrics.ascent};
+  Vector2<f32> pen = {rowPosition.x + Debug_Px_(ui, DEBUG_TEXT_INSET), rowPosition.y + ui->fontMetrics.ascent};
   R_PushText(renderer->gpu, renderer->batch, renderer->atlas, renderer->atlasTexture, renderer->dwrite, pen,
              renderer->font, renderer->fontSize, DEBUG_COLOR_TEXT, text);
 }
@@ -165,12 +177,12 @@ inline void Debug_Text_(Debug_UI *ui, Vector2<f32> rowPosition, String text)
 
 [[nodiscard]] inline Debug_Rect Debug_NextRow_(Debug_UI *ui, f32 height)
 {
-  f32 padding = Debug_Px_(ui, DEBUG_PADDING);
   f32 spacing = Debug_Px_(ui, DEBUG_ROW_SPACING);
   f32 width = Debug_Px_(ui, DEBUG_PANEL_WIDTH);
   Debug_Rect_(ui, {ui->cursor, {width, height + spacing}}, DEBUG_COLOR_PANEL);
 
-  Debug_Rect row = {{ui->cursor.x + padding, ui->cursor.y}, {width - padding * 2, height}};
+  f32 margin = Debug_Px_(ui, DEBUG_ROW_MARGIN_X);
+  Debug_Rect row = {{ui->cursor.x + margin, ui->cursor.y}, {width - margin * 2, height}};
   ui->cursor.y += height + spacing;
   return row;
 }
@@ -197,21 +209,14 @@ inline void Debug_Begin(Debug_UI *ui, const Win32_Input_State *input, Debug_Rend
   }
 
   Debug_Rect_(ui, {ui->panelPosition, {width, titleHeight}}, DEBUG_COLOR_TITLE);
-  Debug_Text_(ui, ui->panelPosition, title);
+  Debug_Text_(ui, {ui->panelPosition.x + Debug_Px_(ui, DEBUG_ROW_MARGIN_X), ui->panelPosition.y}, title);
 
-  f32 padding = Debug_Px_(ui, DEBUG_PADDING);
   ui->cursor = {ui->panelPosition.x, ui->panelPosition.y + titleHeight};
-  Debug_Rect_(ui, {ui->cursor, {width, padding}}, DEBUG_COLOR_PANEL);
-  ui->cursor.y += padding;
 }
 
 [[nodiscard]] inline bool Debug_End(Debug_UI *ui)
 {
   f32 width = Debug_Px_(ui, DEBUG_PANEL_WIDTH);
-  f32 bottomPadding = Debug_Px_(ui, DEBUG_PADDING) - Debug_Px_(ui, DEBUG_ROW_SPACING);
-  Debug_Rect_(ui, {ui->cursor, {width, bottomPadding}}, DEBUG_COLOR_PANEL);
-  ui->cursor.y += bottomPadding;
-
   Debug_Rect panel = {ui->panelPosition, {width, ui->cursor.y - ui->panelPosition.y}};
   bool hasMouse = Debug_MouseIn_(ui, panel) || ui->activeSeen;
 
@@ -225,16 +230,16 @@ inline void Debug_Begin(Debug_UI *ui, const Win32_Input_State *input, Debug_Rend
 // Widgets
 inline void Debug_Label(Debug_UI *ui, String text)
 {
-  Debug_Rect row = Debug_NextRow_(ui, Debug_RowHeight_(ui));
+  auto row = Debug_NextRow_(ui, Debug_RowHeight_(ui));
   Debug_Text_(ui, row.position, text);
 }
 
 #define Debug_Button(ui, label) Debug_Button_((ui), DEBUG_CALL_SITE, (label))
 inline bool Debug_Button_(Debug_UI *ui, const void *callSite, String label)
 {
-  Debug_Widget_Id id = Debug_IdFromCallSite_(ui, callSite);
-  Debug_Rect row = Debug_NextRow_(ui, Debug_RowHeight_(ui));
-  Debug_Interaction interaction = Debug_Interact_(ui, id, row);
+  auto id = Debug_IdFromCallSite_(ui, callSite);
+  auto row = Debug_NextRow_(ui, Debug_RowHeight_(ui));
+  auto interaction = Debug_Interact_(ui, id, row);
 
   Debug_Rect_(ui, row, Debug_WidgetColor_(interaction), DEBUG_CORNER_RADIUS);
   Debug_Text_(ui, row.position, label);
@@ -244,10 +249,10 @@ inline bool Debug_Button_(Debug_UI *ui, const void *callSite, String label)
 #define Debug_Checkbox(ui, value, label) Debug_Checkbox_((ui), DEBUG_CALL_SITE, (value), (label))
 inline bool Debug_Checkbox_(Debug_UI *ui, const void *callSite, bool *value, String label)
 {
-  Debug_Widget_Id id = Debug_IdFromCallSite_(ui, callSite);
+  auto id = Debug_IdFromCallSite_(ui, callSite);
   f32 rowHeight = Debug_RowHeight_(ui);
-  Debug_Rect row = Debug_NextRow_(ui, rowHeight);
-  Debug_Interaction interaction = Debug_Interact_(ui, id, row);
+  auto row = Debug_NextRow_(ui, rowHeight);
+  auto interaction = Debug_Interact_(ui, id, row);
   if (interaction.clicked)
   {
     *value = !*value;
@@ -257,23 +262,25 @@ inline bool Debug_Checkbox_(Debug_UI *ui, const void *callSite, bool *value, Str
   {
     Debug_Rect_(ui, row, Debug_WidgetColor_(interaction), DEBUG_CORNER_RADIUS);
   }
-  Debug_Rect box = {row.position, {rowHeight, rowHeight}};
-  Debug_Rect_(ui, box, DEBUG_COLOR_WIDGET_ACTIVE, DEBUG_CORNER_RADIUS, 1);
+  // smaller than the row so stacked boxes don't touch, on the row's left edge like every widget
+  f32 boxSize = rowHeight - Debug_Px_(ui, DEBUG_CHECKBOX_INSET) * 2;
+  Debug_Rect box = {{row.position.x, row.position.y + (rowHeight - boxSize) * 0.5f}, {boxSize, boxSize}};
+  Debug_Rect_(ui, box, DEBUG_COLOR_BORDER, DEBUG_CORNER_RADIUS, 1);
   if (*value)
   {
-    f32 inset = Debug_Px_(ui, 4);
-    Debug_Rect_(ui, {box.position + inset, box.size - inset * 2}, DEBUG_COLOR_ACCENT, DEBUG_CORNER_RADIUS / 2);
+    f32 checkInset = Debug_Px_(ui, 3);
+    Debug_Rect_(ui, {box.position + checkInset, box.size - checkInset * 2}, DEBUG_COLOR_ACCENT, DEBUG_CORNER_RADIUS / 2);
   }
-  Debug_Text_(ui, {row.position.x + rowHeight, row.position.y}, label);
+  Debug_Text_(ui, {row.position.x + boxSize, row.position.y}, label);
   return interaction.clicked;
 }
 
 #define Debug_SliderF32(ui, value, min, max, label) Debug_SliderF32_((ui), DEBUG_CALL_SITE, (value), (min), (max), (label))
 inline bool Debug_SliderF32_(Debug_UI *ui, const void *callSite, f32 *value, f32 min, f32 max, String label)
 {
-  Debug_Widget_Id id = Debug_IdFromCallSite_(ui, callSite);
-  Debug_Rect row = Debug_NextRow_(ui, Debug_RowHeight_(ui));
-  Debug_Interaction interaction = Debug_Interact_(ui, id, row);
+  auto id = Debug_IdFromCallSite_(ui, callSite);
+  auto row = Debug_NextRow_(ui, Debug_RowHeight_(ui));
+  auto interaction = Debug_Interact_(ui, id, row);
 
   f32 old = *value;
   if (interaction.active)
