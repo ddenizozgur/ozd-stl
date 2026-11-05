@@ -47,7 +47,8 @@ inline constexpr DWM_WINDOW_CORNER_PREFERENCE WIN32_CORNER_PREFERENCES[Window_Co
 inline bool Win32_SetWindowCorners(HWND hWnd, Window_Corners corners)
 {
   DWM_WINDOW_CORNER_PREFERENCE preference = WIN32_CORNER_PREFERENCES[corners];
-  return SUCCEEDED(DwmSetWindowAttribute(hWnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference, sizeof(preference)));
+  auto hResult = DwmSetWindowAttribute(hWnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference, sizeof(preference));
+  return SUCCEEDED(hResult);
 }
 
 // Backdrops require Windows 11 22H2.

@@ -69,7 +69,7 @@ inline IWICImagingFactory *Win32_CreateWicFactory_()
 // false when the bytes aren't an image Windows can read.
 [[nodiscard]]
 inline Pair<Image, bool>
-Win32_WicDecodeImageAs(Arena_Allocator *arena, Slice<u8> fileBytes, Image_Format destFormat)
+Win32_WicDecodeImageAs(Arena_Allocator *arena, Slice<u8> fileBytes, Image_Format dstFormat)
 {
   assert(fileBytes.count <= MAXDWORD && "WIC reads at most 4 GiB from memory");
 
@@ -98,7 +98,7 @@ Win32_WicDecodeImageAs(Arena_Allocator *arena, Slice<u8> fileBytes, Image_Format
   IWICFormatConverter *converter = nullptr;
   factory->CreateFormatConverter(&converter);
   Defer(converter->Release(););
-  const GUID &wicFormat = Win32_WicPixelFormatFrom_(destFormat);
+  const GUID &wicFormat = Win32_WicPixelFormatFrom_(dstFormat);
   if (FAILED(converter->Initialize(frame, wicFormat, WICBitmapDitherTypeNone, nullptr, 0, WICBitmapPaletteTypeCustom)))
   {
     return {};
@@ -106,7 +106,7 @@ Win32_WicDecodeImageAs(Arena_Allocator *arena, Slice<u8> fileBytes, Image_Format
 
   Vector2<u32> size = {};
   converter->GetSize(&size.width, &size.height);
-  u32 bytesPerPixel = ImageFormatBytesPerPixel(destFormat);
+  u32 bytesPerPixel = ImageFormatBytesPerPixel(dstFormat);
   usize rollback = ArenaPosition(arena);
   auto pixels = ArenaPushSlice<u8>(arena, static_cast<usize>(size.width) * size.height * bytesPerPixel);
   if (pixels.ptr == nullptr)
@@ -121,7 +121,7 @@ Win32_WicDecodeImageAs(Arena_Allocator *arena, Slice<u8> fileBytes, Image_Format
     ArenaPopTo(arena, rollback);
     return {};
   }
-  return {{pixels, size, destFormat}, true};
+  return {{pixels, size, dstFormat}, true};
 }
 
 // Returns the bytes of the file, the pixels are converted to the closest format fileFormat can store.

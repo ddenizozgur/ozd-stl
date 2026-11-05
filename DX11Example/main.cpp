@@ -110,8 +110,7 @@ int main()
   Defer(Win32_UninitComOnThread(&com););
 
   auto [classId, classOk] = Win32_RegisterWindowClass(StringLit("DX11ExampleClass"), ExampleWndProc);
-  auto hWnd = Win32_CreateWindow(classId, StringLit("DX11Example"), {1280, 720},
-                                 Window_Kind_Normal, WS_EX_NOREDIRECTIONBITMAP);
+  auto hWnd = Win32_CreateWindow(classId, StringLit("DX11Example"), {1280, 720}, Window_Kind_Normal, WS_EX_NOREDIRECTIONBITMAP);
   Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic);
   Win32_SetWindowCorners(hWnd, Window_Corners_RoundSmall);
 
@@ -167,7 +166,6 @@ int main()
         GlyphAtlasRelease(&atlas);
         Win32_DWriteReleaseFont(&font);
         Win32_DWriteReleaseCollection(dwrite, &fontFiles);
-        // Win32_DWriteReleaseCollection(dwrite, &fontFiles);
         Win32_ReleaseDWrite(&dwrite););
 
   f32 basePixelSize = 15;
@@ -197,7 +195,7 @@ int main()
     Win32_PollMessages(&g.inputState);
     DX11_ResizeSwapchain(gpu, &swapchain, g.windowState.clientSize);
 
-    f32 dpiScale = g.windowState.dpi / static_cast<f32>(USER_DEFAULT_SCREEN_DPI);
+    auto dpiScale = static_cast<f32>(g.windowState.dpi) / USER_DEFAULT_SCREEN_DPI;
     if (g.windowState.dpi != fontDpi)
     {
       fontDpi = g.windowState.dpi;
@@ -312,7 +310,7 @@ int main()
       String prompt = StringFmt(scratch.arena, "> %.*s_", StringArgs(SliceFromFixedList(typed)));
       if (typed.count == 0)
       {
-        prompt = StringLit("> type here, F11 fullscreen");
+        prompt = StringLit("> type smth, F11 fullscreen");
       }
       Vector2<f32> promptPen = {margin, barTop + margin + fontMetrics.ascent};
       UI_PushText(gpu, &uiBatch, &atlas, atlasTexture, dwrite, promptPen, font, pixelSize, {255, 255, 255, 255}, prompt);
