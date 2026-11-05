@@ -123,7 +123,6 @@ inline Vector2<i32> Win32_WindowSizeForClient_(Vector2<u32> clientSize, u32 dpi,
   return {rect.right - rect.left, rect.bottom - rect.top};
 }
 
-// a window bigger than the work area keeps its top-left
 [[nodiscard]]
 inline Vector2<i32> Win32_CenterInWorkArea_(Vector2<i32> workPosition, Vector2<i32> workSize, Vector2<i32> windowSize)
 {
@@ -131,10 +130,7 @@ inline Vector2<i32> Win32_CenterInWorkArea_(Vector2<i32> workPosition, Vector2<i
   return {Maximum(centered.x, workPosition.x), Maximum(centered.y, workPosition.y)};
 }
 
-// the client area is sized for the DPI of the monitor the window opens on.
-// With a monitor the window is centered in its work area. Without one Windows picks the monitor,
-// a Normal window goes where Windows places it and a Borderless one is centered.
-// The window starts hidden.
+// window starts hidden.
 [[nodiscard]]
 inline HWND Win32_CreateWindow(Win32_Window_Class_Id classId, String title, Vector2<u32> clientSize,
                                Window_Kind kind, DWORD exStyle = 0, const Win32_Monitor *monitor = nullptr)
@@ -295,19 +291,12 @@ struct Win32_Input_State
   u8 buttonsPressed;
   u8 buttonsReleased;
   bool mouseInsideClient;
-  Vector2<f32> mousePosition;         // client pixels, top-left origin
-  Vector2<f32> wheelDelta;            // +y away from the user, +x right
-  Fixed_List<char> textWithCtrlChars; // UTF-8, ctrl chars are \b \t \n
+  Vector2<f32> mousePosition; // client pixels, top-left origin
+  Vector2<f32> wheelDelta;
+  char textStorage[256];
+  Fixed_List<char> textWithCtrlChars; // UTF-8, ctrl chars are \b \t \n.
   Utf16_Decoder decoder16;
 };
-
-// a zeroed Win32_Input_State works without text
-[[nodiscard]]
-inline Win32_Input_State
-Win32_InputStateInitForTextInput(Slice<char> textBuffer)
-{
-  return {.textWithCtrlChars = FixedListInit(textBuffer)};
-}
 
 inline void Win32_InputStateClearFrame(Win32_Input_State *inputState)
 {
@@ -316,7 +305,7 @@ inline void Win32_InputStateClearFrame(Win32_Input_State *inputState)
   inputState->buttonsPressed = 0;
   inputState->buttonsReleased = 0;
   inputState->wheelDelta = {};
-  FixedListClear(&inputState->textWithCtrlChars);
+  inputState->textWithCtrlChars = FixedListInit(SliceFromArray(inputState->textStorage));
 }
 
 inline void Win32_PollMessages(Win32_Input_State *inputState)
@@ -494,11 +483,6 @@ inline void Win32_InputStateOnMessage(Win32_Input_State *inputState, HWND hWnd, 
 
   case WM_CHAR:
   {
-    if (inputState->textWithCtrlChars.backingBuffer.ptr == nullptr)
-    {
-      break;
-    }
-
     auto unit = static_cast<u16>(wParam);
     auto decoded = Utf16DecoderPush(&inputState->decoder16, unit);
     for (u32 i = 0; i < decoded.count; i += 1)
@@ -549,7 +533,6 @@ inline void Win32_WindowStateOnMessage(Win32_Window_State *windowState,
     break;
   case WM_DPICHANGED:
   {
-    // x and y DPI are always the same
     windowState->dpi = HIWORD(wParam);
     auto suggested = reinterpret_cast<RECT *>(lParam);
     SetWindowPos(hWnd, nullptr, suggested->left, suggested->top,

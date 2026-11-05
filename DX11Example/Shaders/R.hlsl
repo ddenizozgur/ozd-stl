@@ -1,4 +1,4 @@
-cbuffer UI_Constants : register(b0)
+cbuffer Constants : register(b0)
 {
   float4 gammaRatios;
   float2 screenSize;
@@ -16,6 +16,8 @@ struct Instance
   float2 atlasPosition;
   uint color; // straight alpha
   uint kind;
+  float cornerRadius;
+  float borderThickness;
 };
 
 StructuredBuffer<Instance> instances : register(t0);
@@ -29,6 +31,10 @@ struct Pixel
   nointerpolation float2 screenToAtlas : ATLAS;
   nointerpolation float4 color : COLOR;
   nointerpolation uint kind : KIND;
+  nointerpolation float2 center : CENTER;
+  nointerpolation float2 halfSize : HALFSIZE;
+  nointerpolation float cornerRadius : RADIUS;
+  nointerpolation float borderThickness : BORDER;
   float2 uv : TEXCOORD;
 };
 
@@ -50,6 +56,10 @@ Pixel VSMain(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
   pixel.screenToAtlas = instance.atlasPosition - instance.position;
   pixel.color = UnpackRGBA8(instance.color);
   pixel.kind = instance.kind;
+  pixel.halfSize = instance.size * 0.5;
+  pixel.center = instance.position + pixel.halfSize;
+  pixel.cornerRadius = min(instance.cornerRadius, min(pixel.halfSize.x, pixel.halfSize.y));
+  pixel.borderThickness = instance.borderThickness;
   pixel.uv = corner;
   return pixel;
 }
@@ -68,6 +78,13 @@ float GammaCorrectedAlpha(float coverage, float3 color)
   return alpha + alpha * (1 - alpha) * (correctionSlope * alpha + correctionBase);
 }
 
+// Inigo Quilez's sdRoundedBox: https://iquilezles.org/articles/distfunctions2d/
+float SdRoundedBox(float2 p, float2 halfSize, float radius)
+{
+  float2 q = abs(p) - halfSize + radius;
+  return min(max(q.x, q.y), 0) + length(max(q, 0)) - radius;
+}
+
 float4 PSMain(Pixel pixel) : SV_Target
 {
   float4 color = float4(pixel.color.rgb * pixel.color.a, pixel.color.a);
@@ -77,9 +94,17 @@ float4 PSMain(Pixel pixel) : SV_Target
     float coverage = atlas.Load(int3(texel, 0));
     return color * GammaCorrectedAlpha(coverage, pixel.color.rgb);
   }
+
   if (pixel.kind == KIND_IMAGE)
   {
-    return image.Sample(linearSampler, pixel.uv) * color;
+    color *= image.Sample(linearSampler, pixel.uv);
   }
-  return color;
+
+  float distance = SdRoundedBox(pixel.position.xy - pixel.center, pixel.halfSize, pixel.cornerRadius);
+  if (pixel.borderThickness > 0)
+  {
+    float halfBorder = pixel.borderThickness * 0.5;
+    distance = abs(distance + halfBorder) - halfBorder;
+  }
+  return color * saturate(0.5 - distance);
 }

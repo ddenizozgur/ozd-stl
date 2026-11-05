@@ -13,7 +13,8 @@
 #include "../Win32Stuff/Theme.hpp"
 #include "../Win32Stuff/WicImage.hpp"
 #include "../Win32Stuff/WindowRelated.hpp"
-#include "UI.hpp"
+#include "DebugUI.hpp"
+#include "R.hpp"
 
 struct Example_Globals
 {
@@ -123,8 +124,6 @@ int main()
         DX11_ReleaseSwapchain(&swapchain););
 
   auto arena = ArenaInit();
-  g.inputState = Win32_InputStateInitForTextInput(ArenaPushSlice<char>(&arena, 256));
-
   auto imagePath = Win32_PathFromExe(&arena, StringLit("../Assets/Pattern.png"));
   auto [fileBytes, fileOk] = Win32_ReadEntireFile(&arena, imagePath);
   auto [image, imageOk] = Win32_WicDecodeImageAs(&arena, fileBytes, Image_Format_RGBA8Premultiplied);
@@ -140,26 +139,26 @@ int main()
   auto textureSize = DX11_GetTexture2DSize(texture);
   auto imageAspect = static_cast<f32>(textureSize.width) / textureSize.height;
 
-  auto uiShaderPath = Win32_PathFromExe(&arena, StringLit("../Shaders/UI.hlsl"));
-  auto [uiVsBytes, uiVsOk] = DX11_CompileShaderFromFile(&arena, uiShaderPath, "VSMain", DX11_VERTEX_SHADER_TARGET);
-  auto [uiPsBytes, uiPsOk] = DX11_CompileShaderFromFile(&arena, uiShaderPath, "PSMain", DX11_PIXEL_SHADER_TARGET);
-  auto uiVertexShader = DX11_CreateVertexShader(gpu, uiVsBytes);
-  auto uiPixelShader = DX11_CreatePixelShader(gpu, uiPsBytes);
-  auto [uiConstants, uiConstantsOk] = DX11_CreateConstantBuffer(gpu, sizeof(UI_Constants));
+  auto shaderPath = Win32_PathFromExe(&arena, StringLit("../Shaders/R.hlsl"));
+  auto [vsBytes, vsOk] = DX11_CompileShaderFromFile(&arena, shaderPath, "VSMain", DX11_VERTEX_SHADER_TARGET);
+  auto [psBytes, psOk] = DX11_CompileShaderFromFile(&arena, shaderPath, "PSMain", DX11_PIXEL_SHADER_TARGET);
+  auto vertexShader = DX11_CreateVertexShader(gpu, vsBytes);
+  auto pixelShader = DX11_CreatePixelShader(gpu, psBytes);
+  auto [constantsGpu, constantsGpuOk] = DX11_CreateConstantBuffer(gpu, sizeof(R_Constants));
 
-  auto instances = ArenaPushSlice<UI_Instance>(&arena, 16 * 1024);
-  auto [uiBatch, uiBatchOk] = UI_InitBatch(gpu, instances);
-  Defer(Win32_ComSafeRelease(&uiVertexShader);
-        Win32_ComSafeRelease(&uiPixelShader);
-        DX11_ReleaseConstantBuffer(&uiConstants);
-        UI_ReleaseBatch(&uiBatch););
+  auto instances = ArenaPushSlice<R_Instance>(&arena, 16 * 1024);
+  auto [batch, batchOk] = R_InitBatch(gpu, instances);
+  Defer(Win32_ComSafeRelease(&vertexShader);
+        Win32_ComSafeRelease(&pixelShader);
+        DX11_ReleaseConstantBuffer(&constantsGpu);
+        R_ReleaseBatch(&batch););
 
   auto dwrite = Win32_CreateDWrite();
   auto blendParams = Win32_DWriteBlendParams(dwrite);
-  String fontPaths[] = {Win32_PathFromExe(&arena, StringLit("../Assets/JetBrainsMono-Regular.ttf"))};
-  auto fontFiles = Win32_DWriteCollectionFromFiles(dwrite, SliceFromArray(fontPaths));
-  // auto fontFiles = Win32_DWriteCollectionFromSystem(dwrite);
-  auto [font, fontOk] = Win32_DWriteFontFromCollection(fontFiles, StringLit("JetBrains Mono"));
+  // String fontPaths[] = {Win32_PathFromExe(&arena, StringLit("../Assets/JetBrainsMono-Regular.ttf"))};
+  // auto fontFiles = Win32_DWriteCollectionFromFiles(dwrite, SliceFromArray(fontPaths));
+  auto fontFiles = Win32_DWriteCollectionFromSystem(dwrite);
+  auto [font, fontOk] = Win32_DWriteFontFromCollection(fontFiles, StringLit("Consolas"));
   auto [atlas, atlasOk] = GlyphAtlasInit(&arena, {1024, 1024});
   auto [atlasTexture, atlasTextureOk] = DX11_CreateTexture2D(gpu, atlas.coverage, atlas.size, DXGI_FORMAT_R8_UNORM, false, true);
   Defer(DX11_ReleaseTexture2D(&atlasTexture);
@@ -168,14 +167,17 @@ int main()
         Win32_DWriteReleaseCollection(dwrite, &fontFiles);
         Win32_ReleaseDWrite(&dwrite););
 
-  f32 basePixelSize = 15;
+  f32 basePixelSize = 16;
   u32 fontDpi = 0;
   f32 pixelSize = 0;
   Font_Metrics fontMetrics = {};
   f32 charAdvance = 0;
 
   f32 scroll = 0;
+  f32 scrollSpeed = 30;
   bool paused = false;
+  bool showImage = true;
+  Debug_UI debug = {.panelPosition = {16, 16}};
   auto typed = FixedListInit(ArenaPushSlice<char>(&arena, 256));
   bool fullscreen = false;
   Win32_Windowed_Placement windowed = {};
@@ -221,13 +223,9 @@ int main()
         Win32_ExitFullscreen(hWnd, windowed);
       }
     }
-    if (Win32_ButtonPressed(&g.inputState, Mouse_Button_Left))
-    {
-      paused = !paused;
-    }
     if (!paused)
     {
-      scroll += frameTime * 30 * dpiScale;
+      scroll += frameTime * scrollSpeed * dpiScale;
     }
     scroll -= g.inputState.wheelDelta.y * 3 * fontMetrics.lineHeightRounded;
     scroll = Maximum(scroll, 0.0f);
@@ -250,32 +248,32 @@ int main()
 
     auto swapchainSize = DX11_GetSwapchainSize(swapchain);
     {
-      UI_Constants constantsUI = {
+      R_Constants constantsFrame = {
         .gammaRatios = blendParams.gammaRatios,
         .screenSize = {static_cast<f32>(swapchainSize.width), static_cast<f32>(swapchainSize.height)},
         .enhancedContrast = blendParams.enhancedContrast,
       };
-      DX11_UpdateConstantBuffer(gpu, uiConstants, SliceAsBytes(SliceMake(&constantsUI, 1)));
+      DX11_UpdateConstantBuffer(gpu, constantsGpu, SliceAsBytes(SliceMake(&constantsFrame, 1)));
 
       DX11_ClearBackbuffer(gpu, swapchain, {0.1f, 0.2f, 0.3f, 1});
       DX11_SetBackbufferAsRenderTarget(gpu, swapchain);
 
       auto context = gpu.immediateContext1;
       context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-      context->VSSetShader(uiVertexShader, nullptr, 0);
-      context->VSSetConstantBuffers(0, 1, &uiConstants.buffer);
-      context->VSSetShaderResources(0, 1, &uiBatch.gpuInstances.view);
-      context->PSSetShader(uiPixelShader, nullptr, 0);
-      context->PSSetConstantBuffers(0, 1, &uiConstants.buffer);
-      ID3D11ShaderResourceView *pixelResourcesArray[] = {atlasTexture.view, texture.view};
-      context->PSSetShaderResources(1, static_cast<u32>(ArrayCount(pixelResourcesArray)), pixelResourcesArray);
+      context->VSSetShader(vertexShader, nullptr, 0);
+      context->VSSetConstantBuffers(0, 1, &constantsGpu.buffer);
+      context->VSSetShaderResources(0, 1, &batch.gpuInstances.view);
+      context->PSSetShader(pixelShader, nullptr, 0);
+      context->PSSetConstantBuffers(0, 1, &constantsGpu.buffer);
+      ID3D11ShaderResourceView *pixelResources[] = {atlasTexture.view, texture.view};
+      context->PSSetShaderResources(1, static_cast<u32>(ArrayCount(pixelResources)), pixelResources);
       context->PSSetSamplers(0, 1, &sampler);
       context->OMSetBlendState(blend, nullptr, 0xFFFFFFFF);
 
       auto scratch = ScratchBegin();
       Defer(ScratchEnd(scratch););
 
-      Vector2<f32> screenSize = constantsUI.screenSize;
+      Vector2<f32> screenSize = constantsFrame.screenSize;
 
       f32 margin = 8 * dpiScale;
       f32 lineHeight = fontMetrics.lineHeightRounded;
@@ -292,30 +290,62 @@ int main()
                        g.inputState.mousePosition.y < lineTop + lineHeight;
         if (hovered)
         {
-          UI_PushRect(gpu, &uiBatch, {0, lineTop}, {screenSize.width, lineHeight}, {255, 255, 255, 40});
+          R_PushRect(gpu, &batch, {0, lineTop}, {screenSize.width, lineHeight}, {255, 255, 255, 40});
         }
         String line = WallLine(scratch.arena, firstLine + i, charsPerLine);
         Vector4<u8> color = PALETTE_VINIK24[(firstLine + i) % ArrayCount(PALETTE_VINIK24)];
         Vector2<f32> pen = {margin, lineTop + fontMetrics.ascent};
-        UI_PushText(gpu, &uiBatch, &atlas, atlasTexture, dwrite, pen, font, pixelSize, color, line);
+        R_PushText(gpu, &batch, &atlas, atlasTexture, dwrite, pen, font, pixelSize, color, line);
       }
 
-      f32 imageHeight = screenSize.height * 0.6f;
-      Vector2<f32> imageSize = {imageHeight * imageAspect, imageHeight};
-      UI_PushImage(gpu, &uiBatch, (screenSize - imageSize) / 2.0f, imageSize);
+      if (showImage)
+      {
+        f32 imageHeight = screenSize.height * 0.6f;
+        Vector2<f32> imageSize = {imageHeight * imageAspect, imageHeight};
+        R_PushImage(gpu, &batch, (screenSize - imageSize) / 2.0f, imageSize, {255, 255, 255, 255}, 24 * dpiScale);
+      }
 
       f32 barHeight = lineHeight + margin * 2;
       f32 barTop = screenSize.height - barHeight;
-      UI_PushRect(gpu, &uiBatch, {0, barTop}, {screenSize.width, barHeight}, {0, 0, 0, 200});
+      R_PushRect(gpu, &batch, {0, barTop}, {screenSize.width, barHeight}, {0, 0, 0, 200});
       String prompt = StringFmt(scratch.arena, "> %.*s_", StringArgs(SliceFromFixedList(typed)));
       if (typed.count == 0)
       {
         prompt = StringLit("> type smth, F11 fullscreen");
       }
       Vector2<f32> promptPen = {margin, barTop + margin + fontMetrics.ascent};
-      UI_PushText(gpu, &uiBatch, &atlas, atlasTexture, dwrite, promptPen, font, pixelSize, {255, 255, 255, 255}, prompt);
+      R_PushText(gpu, &batch, &atlas, atlasTexture, dwrite, promptPen, font, pixelSize, {255, 255, 255, 255}, prompt);
 
-      UI_Flush(gpu, &uiBatch);
+      {
+        Debug_Renderer debugRenderer = {
+          .gpu = gpu,
+          .batch = &batch,
+          .atlas = &atlas,
+          .atlasTexture = atlasTexture,
+          .dwrite = dwrite,
+          .font = font,
+          .fontSize = pixelSize,
+          .dpiScale = dpiScale,
+        };
+        Debug_Begin(&debug, &g.inputState, debugRenderer, StringLit("Debug"));
+
+        Debug_Label(&debug, StringFmt(scratch.arena, "scroll %.0f px", scroll));
+        Debug_Checkbox(&debug, &paused, StringLit("Paused"));
+        Debug_Checkbox(&debug, &showImage, StringLit("Show image"));
+        Debug_SliderF32(&debug, &scrollSpeed, 0, 300, StringFmt(scratch.arena, "Scroll speed %.0f", scrollSpeed));
+        if (Debug_Button(&debug, StringLit("Back to top")))
+        {
+          scroll = 0;
+        }
+        auto debugHasMouse = Debug_End(&debug);
+
+        if (!debugHasMouse && Win32_ButtonPressed(&g.inputState, Mouse_Button_Left))
+        {
+          paused = !paused;
+        }
+      }
+
+      R_Flush(gpu, &batch);
     }
 
     DX11_PresentSwapchain(swapchain, 0);
