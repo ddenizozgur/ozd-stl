@@ -41,6 +41,17 @@ X(unsigned long)
 #undef X
 // long appers to be a distinct type from int. I dunno why
 
+template <typename A, typename B>
+struct Is_Same
+{
+  static constexpr bool VALUE = false;
+};
+template <typename A>
+struct Is_Same<A, A>
+{
+  static constexpr bool VALUE = true;
+};
+
 template <typename T>
 struct Type_Identity
 {

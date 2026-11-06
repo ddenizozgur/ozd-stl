@@ -1,6 +1,4 @@
 #include "../Base/Time.hpp"
-#include "../Win32Stuff/DWrite.hpp"
-#include "../Win32Stuff/GlyphAtlas.hpp"
 #include "../Win32Stuff/TaskDialog.hpp"
 #include "../Win32Stuff/Theme.hpp"
 #include "../Win32Stuff/WindowRelated.hpp"
@@ -42,122 +40,16 @@ void UpdateTitle(HWND hWnd, f32 frameTime)
   frameCounter += 1;
 }
 
-// blends the coverage as is
-void PutGlyphBitmap(R_FrameBuffer *frameBuffer, const Glyph_Atlas *atlas, Glyph_Atlas_Slot glyph,
-                    Vector2<i32> pen, R_B8G8R8A8 color)
-{
-  auto topLeft = pen + glyph.offset;
-  i32 width = glyph.size.width;
-  i32 height = glyph.size.height;
-  i32 left = Maximum(0, -topLeft.x);
-  i32 top = Maximum(0, -topLeft.y);
-  i32 right = Minimum(width, frameBuffer->size.width - topLeft.x);
-  i32 bottom = Minimum(height, frameBuffer->size.height - topLeft.y);
-
-  for (auto y = top; y < bottom; y += 1)
-  {
-    for (auto x = left; x < right; x += 1)
-    {
-      auto atlasIndex = (static_cast<usize>(glyph.position.y) + y) * atlas->size.width + glyph.position.x + x;
-      if (u8 coverage = atlas->coverage[atlasIndex]; coverage != 0)
-      {
-        R_BlendPixelUnsafe(frameBuffer, topLeft + Vector2<i32>{x, y}, color, coverage / 255.0f);
-      }
-    }
-  }
-}
-
-Vector2<f32> PutStringDWriteUtf8(R_FrameBuffer *frameBuffer, Win32_DWrite dwrite,
-                                 Glyph_Atlas *atlas, Vector2<f32> pen, R_B8G8R8A8 color,
-                                 Win32_DWrite_Font font, f32 fontSize, String text, bool codeLigatures = false)
-{
-  auto scratch = ScratchBegin();
-  Defer(ScratchEnd(scratch););
-
-  for (auto shaped : Win32_DWriteShapeText(scratch.arena, dwrite, font, fontSize, text, codeLigatures))
-  {
-    auto [glyph, glyphOk] = Win32_DWriteGlyphFromAtlas(atlas, dwrite, font, fontSize, shaped.index);
-    PutGlyphBitmap(frameBuffer, atlas, glyph, R_PositionFrom(pen + shaped.offset), color);
-    pen.x += RoundHalfDownF32(shaped.advance);
-  }
-  return pen;
-}
-
-// blends with the user's gamma and contrast
-void PutGlyphBitmapGammaCorrected(R_FrameBuffer *frameBuffer, const Glyph_Atlas *atlas, Glyph_Atlas_Slot glyph,
-                                  Vector2<i32> pen, R_B8G8R8A8 color, const Win32_DWrite_Blend_Table_For_Cpu *blendTable)
-{
-  auto topLeft = pen + glyph.offset;
-  i32 width = glyph.size.width;
-  i32 height = glyph.size.height;
-  i32 left = Maximum(0, -topLeft.x);
-  i32 top = Maximum(0, -topLeft.y);
-  i32 right = Minimum(width, frameBuffer->size.width - topLeft.x);
-  i32 bottom = Minimum(height, frameBuffer->size.height - topLeft.y);
-
-  for (auto y = top; y < bottom; y += 1)
-  {
-    for (auto x = left; x < right; x += 1)
-    {
-      auto atlasIndex = (static_cast<usize>(glyph.position.y) + y) * atlas->size.width + glyph.position.x + x;
-      if (u8 coverage = atlas->coverage[atlasIndex]; coverage != 0)
-      {
-        R_BlendPixelUnsafe(frameBuffer, topLeft + Vector2<i32>{x, y}, color, blendTable->alphas[coverage]);
-      }
-    }
-  }
-}
-
-Vector2<f32> PutStringDWriteUtf8GammaCorrected(R_FrameBuffer *frameBuffer, Win32_DWrite dwrite,
-                                               Win32_DWrite_Blend_Params blendParams,
-                                               Glyph_Atlas *atlas, Vector2<f32> pen, R_B8G8R8A8 color,
-                                               Win32_DWrite_Font font, f32 fontSize, String text, bool codeLigatures = false)
-{
-  auto scratch = ScratchBegin();
-  Defer(ScratchEnd(scratch););
-
-  auto blendTable = Win32_DWriteBlendTableForCpu(blendParams, {color.r / 255.0f, color.g / 255.0f, color.b / 255.0f});
-  for (auto shaped : Win32_DWriteShapeText(scratch.arena, dwrite, font, fontSize, text, codeLigatures))
-  {
-    auto [glyph, glyphOk] = Win32_DWriteGlyphFromAtlas(atlas, dwrite, font, fontSize, shaped.index);
-    PutGlyphBitmapGammaCorrected(frameBuffer, atlas, glyph, R_PositionFrom(pen + shaped.offset), color, &blendTable);
-    pen.x += RoundHalfDownF32(shaped.advance);
-  }
-  return pen;
-}
-
 int main()
 {
   Vector2<i32> frameBufferSize = {1600, 900};
   auto [classId, classOk] = Win32_RegisterWindowClass(StringLit("ExampleClass"), ExampleWndProc);
-  auto hWnd = Win32_CreateWindow(classId, StringLit("SomeApp"), {1600, 900}, Window_Kind_Normal);
+  auto hWnd = Win32_CreateWindow(classId, StringLit("SomeApp"), frameBufferSize, Window_Kind_Normal);
   Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic, true);
   ShowWindow(hWnd, SW_SHOWMAXIMIZED);
 
   auto arena = ArenaInit();
   auto frameBuffer = R_CreateFrameBuffer(&arena, frameBufferSize);
-
-  auto dwrite = Win32_CreateDWrite();
-  auto blendParams = Win32_DWriteBlendParams(dwrite);
-  auto systemFonts = Win32_DWriteCollectionFromSystem(dwrite);
-
-  {
-    auto scratch = ScratchBegin();
-    Defer(ScratchEnd(scratch););
-
-    for (auto name : Win32_DWriteCollectionFamilyNames(scratch.arena, systemFonts))
-    {
-      printf("systemFont: %.*s\n", StringArgs(name));
-    }
-  }
-
-  auto [font, fontOk] = Win32_DWriteFontFromCollection(systemFonts, StringLit("Consolas"), 400);
-  Defer(Win32_DWriteReleaseFont(&font);
-        Win32_DWriteReleaseCollection(dwrite, &systemFonts);
-        Win32_ReleaseDWrite(&dwrite););
-
-  auto [atlas, atlasOk] = GlyphAtlasInit(&arena, {1024, 1024});
-  Defer(GlyphAtlasRelease(&atlas););
 
   auto timeNow = Win32_NowNanoseconds();
   auto timeLast = timeNow;
@@ -178,27 +70,9 @@ int main()
       R_Clear(&frameBuffer, {0x44, 0x33, 0x22, 0xff});
       Defer(R_PresentFrameBuffer(hWnd, hDC, frameBuffer););
 
-      f32 lineTop = 0;
-      for (u32 y = 1; y < 30; y += 1)
-      {
-        auto scratch = ScratchBegin();
-        Defer(ScratchEnd(scratch););
-
-        f32 fontSize = y + 8;
-        auto metrics = Win32_DWriteFontMetrics(font, fontSize);
-        f32 correctedBaseline = lineTop + metrics.ascent;
-        f32 plainBaseline = correctedBaseline + metrics.lineHeightRounded;
-        f32 rightHalf = frameBuffer.size.x / 2.0f;
-        String text = StringFmt(scratch.arena, "DirectWrite: Hello, ğüşıöç ÆØÅ 12345 | %.2f", fontSize);
-        PutStringDWriteUtf8GammaCorrected(&frameBuffer, dwrite, blendParams, &atlas, {0, correctedBaseline}, R_WHITE, font, fontSize, text);
-        PutStringDWriteUtf8(&frameBuffer, dwrite, &atlas, {0, plainBaseline}, R_WHITE, font, fontSize, text);
-
-        PutStringDWriteUtf8GammaCorrected(&frameBuffer, dwrite, blendParams, &atlas, {rightHalf, correctedBaseline}, R_CGA_YELLOW, font, fontSize, text);
-        PutStringDWriteUtf8(&frameBuffer, dwrite, &atlas, {rightHalf, plainBaseline}, R_CGA_YELLOW, font, fontSize, text);
-        lineTop += metrics.lineHeightRounded * 2;
-      }
+      R_HexDump(&frameBuffer, R_FONT_ATI_8X14, {}, (void *)main, 48, 48);
     }
 
-    // DwmFlush();
+    DwmFlush();
   }
 }

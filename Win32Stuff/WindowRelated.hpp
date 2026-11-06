@@ -114,10 +114,10 @@ enum : Window_Kind
 };
 
 [[nodiscard]]
-inline Vector2<i32> Win32_WindowSizeForClient_(Vector2<u32> clientSize, u32 dpi, DWORD style, DWORD exStyle)
+inline Vector2<i32> Win32_WindowSizeForClient_(Vector2<i32> clientSize, u32 dpi, DWORD style, DWORD exStyle)
 {
-  RECT rect = {0, 0, static_cast<LONG>(clientSize.width * dpi / USER_DEFAULT_SCREEN_DPI),
-               static_cast<LONG>(clientSize.height * dpi / USER_DEFAULT_SCREEN_DPI)};
+  auto dpiI32 = static_cast<i32>(dpi);
+  RECT rect = {0, 0, clientSize.width * dpiI32 / USER_DEFAULT_SCREEN_DPI, clientSize.height * dpiI32 / USER_DEFAULT_SCREEN_DPI};
   AdjustWindowRectExForDpi(&rect, style, false, exStyle, dpi);
   return {rect.right - rect.left, rect.bottom - rect.top};
 }
@@ -131,7 +131,7 @@ inline Vector2<i32> Win32_CenterInWorkArea_(Vector2<i32> workPosition, Vector2<i
 
 // window starts hidden.
 [[nodiscard]]
-inline HWND Win32_CreateWindow(Win32_Window_Class_Id classId, String title, Vector2<u32> clientSize,
+inline HWND Win32_CreateWindow(Win32_Window_Class_Id classId, String title, Vector2<i32> clientSize,
                                Window_Kind kind, DWORD exStyle = 0, const Win32_Monitor *monitor = nullptr)
 {
   auto scratch = ScratchBegin();
@@ -498,7 +498,7 @@ inline void Win32_InputStateOnMessage(Win32_Input_State *inputState, HWND hWnd, 
 //
 struct Win32_Window_State
 {
-  Vector2<u32> clientSize;
+  Vector2<i32> clientSize;
   u32 dpi;
   bool focused;
   bool destroyed;

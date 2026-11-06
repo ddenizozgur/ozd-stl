@@ -64,25 +64,16 @@ inline constexpr f32 DEBUG_ROW_SPACING = 4;
 inline constexpr f32 DEBUG_ROW_MARGIN_X = 4;
 inline constexpr f32 DEBUG_CORNER_RADIUS = DEBUG_ROW_MARGIN_X * 2;
 
-inline constexpr Vector4<u8> DEBUG_COLOR_PANEL = {24, 26, 32, 235};
-inline constexpr Vector4<u8> DEBUG_COLOR_TITLE = {44, 48, 60, 255};
-inline constexpr Vector4<u8> DEBUG_COLOR_WIDGET = {48, 53, 66, 255};
-inline constexpr Vector4<u8> DEBUG_COLOR_WIDGET_HOT = {62, 68, 84, 255};
-inline constexpr Vector4<u8> DEBUG_COLOR_WIDGET_ACTIVE = {78, 86, 106, 255};
-inline constexpr Vector4<u8> DEBUG_COLOR_ACCENT = {65, 106, 163, 255};
-inline constexpr Vector4<u8> DEBUG_COLOR_TEXT = {230, 232, 240, 255};
-inline constexpr Vector4<u8> DEBUG_COLOR_BORDER = {78, 86, 106, 255};
-
-/*
 inline constexpr Vector4<u8> DEBUG_COLOR_PANEL = {50, 50, 50, 255};
 inline constexpr Vector4<u8> DEBUG_COLOR_TITLE = {25, 25, 25, 255};
 inline constexpr Vector4<u8> DEBUG_COLOR_WIDGET = {75, 75, 75, 255};
 inline constexpr Vector4<u8> DEBUG_COLOR_WIDGET_HOT = {95, 95, 95, 255};
 inline constexpr Vector4<u8> DEBUG_COLOR_WIDGET_ACTIVE = {115, 115, 115, 255};
-inline constexpr Vector4<u8> DEBUG_COLOR_ACCENT = {220, 140, 40, 255};
+inline constexpr Vector4<u8> DEBUG_COLOR_ACCENT = {200, 125, 35, 255}; // {220, 140, 40, 255};
 inline constexpr Vector4<u8> DEBUG_COLOR_TEXT = {230, 230, 230, 255};
 inline constexpr Vector4<u8> DEBUG_COLOR_BORDER = {150, 150, 150, 255};
-*/
+inline constexpr Vector4<u8> DEBUG_COLOR_TRACK = {30, 30, 30, 255};
+inline constexpr Vector4<u8> DEBUG_COLOR_TRACK_HOT = {44, 44, 44, 255};
 
 [[nodiscard]] inline f32 Debug_Px_(const Debug_UI *ui, f32 pixelsAt100)
 {
@@ -262,7 +253,7 @@ inline bool Debug_Checkbox_(Debug_UI *ui, const void *callSite, bool *value, Str
   {
     Debug_Rect_(ui, row, Debug_WidgetColor_(interaction), DEBUG_CORNER_RADIUS);
   }
-  // smaller than the row so stacked boxes don't touch, on the row's left edge like every widget
+
   f32 boxSize = rowHeight - Debug_Px_(ui, DEBUG_CHECKBOX_INSET) * 2;
   Debug_Rect box = {{row.position.x, row.position.y + (rowHeight - boxSize) * 0.5f}, {boxSize, boxSize}};
   Debug_Rect_(ui, box, DEBUG_COLOR_BORDER, DEBUG_CORNER_RADIUS, 1);
@@ -289,7 +280,8 @@ inline bool Debug_SliderF32_(Debug_UI *ui, const void *callSite, f32 *value, f32
     *value = LerpF32(min, max, t);
   }
 
-  Debug_Rect_(ui, row, Debug_WidgetColor_(interaction), DEBUG_CORNER_RADIUS);
+  auto trackColor = interaction.hot || interaction.active ? DEBUG_COLOR_TRACK_HOT : DEBUG_COLOR_TRACK;
+  Debug_Rect_(ui, row, trackColor, DEBUG_CORNER_RADIUS);
   f32 filled = Clamp((*value - min) / (max - min), 0.0f, 1.0f);
   Debug_Rect_(ui, {row.position, {RoundHalfDownF32(row.size.width * filled), row.size.height}}, DEBUG_COLOR_ACCENT, DEBUG_CORNER_RADIUS);
   Debug_Text_(ui, row.position, label);

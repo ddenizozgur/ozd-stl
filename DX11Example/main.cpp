@@ -157,6 +157,7 @@ int main()
   auto blendParams = Win32_DWriteBlendParams(dwrite);
   // String fontPaths[] = {Win32_PathFromExe(&arena, StringLit("../Assets/JetBrainsMono-Regular.ttf"))};
   // auto fontFiles = Win32_DWriteCollectionFromFiles(dwrite, SliceFromArray(fontPaths));
+  // auto [font, fontOk] = Win32_DWriteFontFromCollection(fontFiles, StringLit("JetBrains Mono"));
   auto fontFiles = Win32_DWriteCollectionFromSystem(dwrite);
   auto [font, fontOk] = Win32_DWriteFontFromCollection(fontFiles, StringLit("Consolas"));
   auto [atlas, atlasOk] = GlyphAtlasInit(&arena, {1024, 1024});
@@ -195,7 +196,9 @@ int main()
 
     DX11_WaitForBetterLatency(swapchain); // call it before handling input
     Win32_PollMessages(&g.inputState);
-    DX11_ResizeSwapchain(gpu, &swapchain, g.windowState.clientSize);
+    Vector2<u32> swapchainTargetSize = {static_cast<u32>(g.windowState.clientSize.width),
+                                        static_cast<u32>(g.windowState.clientSize.height)};
+    DX11_ResizeSwapchain(gpu, &swapchain, swapchainTargetSize);
 
     auto dpiScale = static_cast<f32>(g.windowState.dpi) / USER_DEFAULT_SCREEN_DPI;
     if (g.windowState.dpi != fontDpi)
@@ -331,7 +334,7 @@ int main()
         };
         Debug_Begin(&debug, &g.inputState, debugRenderer, StringLit("Debug"));
 
-        Debug_Label(&debug, StringFmt(scratch.arena, "scroll %.0f px", scroll));
+        Debug_Label(&debug, StringFmt(scratch.arena, "Scroll %.0f px", scroll));
         Debug_Checkbox(&debug, &paused, StringLit("Paused"));
         Debug_Checkbox(&debug, &showImage, StringLit("Show image"));
         Debug_SliderF32(&debug, &scrollSpeed, 0, 300, StringFmt(scratch.arena, "Scroll speed %.0f", scrollSpeed));

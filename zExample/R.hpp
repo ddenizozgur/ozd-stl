@@ -341,7 +341,6 @@ inline const u8 *R_GlyphRows(R_UnicodeFont font, Rune rune)
   Rune candidates[3] = {rune, RUNE_ERROR, '?'};
   for (auto candidate : SliceFromArray(candidates))
   {
-    // runes above 0xFFFF would wrap around in the u16 search
     if (candidate <= 0xFFFF)
     {
       search = SliceBinarySearch(font.sortedRunes, candidate);
