@@ -1,8 +1,13 @@
+#define _CRT_SECURE_NO_WARNINGS
+
+#include "../Base/File.hpp"
 #include "../Base/Time.hpp"
-#include "../Win32Stuff/TaskDialog.hpp"
 #include "../Win32Stuff/Theme.hpp"
 #include "../Win32Stuff/WindowRelated.hpp"
 #include "R3D.hpp"
+
+#define CGLTF_IMPLEMENTATION
+#include "../Vendor/cgltf.h"
 
 struct Example_Globals
 {
@@ -40,50 +45,38 @@ void UpdateTitle(HWND hWnd, f32 frameTime)
   frameCounter += 1;
 }
 
-inline constexpr Vector3<f32> CUBE[36] = {
-  // +z
-  {-0.5f, 0.5f, 0.5f},
-  {0.5f, 0.5f, 0.5f},
-  {0.5f, -0.5f, 0.5f},
-  {-0.5f, 0.5f, 0.5f},
-  {0.5f, -0.5f, 0.5f},
-  {-0.5f, -0.5f, 0.5f},
-  // -z
-  {0.5f, 0.5f, -0.5f},
-  {-0.5f, 0.5f, -0.5f},
-  {-0.5f, -0.5f, -0.5f},
-  {0.5f, 0.5f, -0.5f},
-  {-0.5f, -0.5f, -0.5f},
-  {0.5f, -0.5f, -0.5f},
-  // -x
-  {-0.5f, 0.5f, -0.5f},
-  {-0.5f, 0.5f, 0.5f},
-  {-0.5f, -0.5f, 0.5f},
-  {-0.5f, 0.5f, -0.5f},
-  {-0.5f, -0.5f, 0.5f},
-  {-0.5f, -0.5f, -0.5f},
-  // +x
-  {0.5f, 0.5f, 0.5f},
-  {0.5f, 0.5f, -0.5f},
-  {0.5f, -0.5f, -0.5f},
-  {0.5f, 0.5f, 0.5f},
-  {0.5f, -0.5f, -0.5f},
-  {0.5f, -0.5f, 0.5f},
-  // +y
-  {-0.5f, 0.5f, -0.5f},
-  {0.5f, 0.5f, -0.5f},
-  {0.5f, 0.5f, 0.5f},
-  {-0.5f, 0.5f, -0.5f},
-  {0.5f, 0.5f, 0.5f},
-  {-0.5f, 0.5f, 0.5f},
-  // -y
-  {-0.5f, -0.5f, 0.5f},
-  {0.5f, -0.5f, 0.5f},
-  {0.5f, -0.5f, -0.5f},
-  {-0.5f, -0.5f, 0.5f},
-  {0.5f, -0.5f, -0.5f},
-  {-0.5f, -0.5f, -0.5f},
+struct Mesh
+{
+  Slice<Vector3<f32>> positions;
+  Slice<u32> indices;
 };
+
+inline Mesh LoadMesh(Arena_Allocator *arena, const char *path)
+{
+  cgltf_options options = {};
+  cgltf_data *data = nullptr;
+  if (cgltf_parse_file(&options, path, &data) != cgltf_result_success)
+  {
+    return {};
+  }
+  Defer(cgltf_free(data););
+
+  if (cgltf_load_buffers(&options, data, path) != cgltf_result_success ||
+      cgltf_validate(data) != cgltf_result_success)
+  {
+    return {};
+  }
+
+  auto primitive = &data->meshes[0].primitives[0];
+  auto accessor = cgltf_find_accessor(primitive, cgltf_attribute_type_position, 0);
+
+  Mesh mesh = {};
+  mesh.positions = ArenaPushSlice<Vector3<f32>>(arena, accessor->count);
+  cgltf_accessor_unpack_floats(accessor, mesh.positions.ptr->data, mesh.positions.count * 3);
+  mesh.indices = ArenaPushSlice<u32>(arena, primitive->indices->count);
+  cgltf_accessor_unpack_indices(primitive->indices, mesh.indices.ptr, sizeof(u32), mesh.indices.count);
+  return mesh;
+}
 
 inline constexpr f32 WORLD_NEAR_Z = 0.1f;
 inline constexpr f32 WORLD_FAR_Z = 100;
@@ -143,7 +136,7 @@ inline void CameraUpdate(R3D_Camera *camera, f32 frameTime)
 }
 
 [[nodiscard]]
-inline Pair<Vector2<f32>, bool> ProjectToScreen(const R_FrameBuffer *frameBuffer,
+inline Pair<Vector3<f32>, bool> ProjectToScreen(const R_FrameBuffer *frameBuffer,
                                                 const Matrix4x4 &toClip, Vector3<f32> position)
 {
   Vector4<f32> point = {.w = 1};
@@ -154,18 +147,20 @@ inline Pair<Vector2<f32>, bool> ProjectToScreen(const R_FrameBuffer *frameBuffer
   {
     return {};
   }
-  return {R_NDCToPosition(clip.xy / clip.w, {{}, frameBuffer->size}), true};
+  Vector2<f32> screen = R_NDCToPosition(clip.xy / clip.w, {{}, frameBuffer->size});
+  f32 depth = clip.z / clip.w;
+  return {{screen.x, screen.y, depth}, true};
 }
 
-inline void DrawModelTriangleFlat(R_FrameBuffer *frameBuffer, const Matrix4x4 &mvp,
-                                  const Vector3<f32> (&positions)[3], R_B8G8R8A8 color)
+inline void DrawTriangleFlat(R_FrameBuffer *frameBuffer, const Matrix4x4 &mvp,
+                             const Vector3<f32> (&positions)[3], R_B8G8R8A8 color)
 {
   auto [screen0, ok0] = ProjectToScreen(frameBuffer, mvp, positions[0]);
   auto [screen1, ok1] = ProjectToScreen(frameBuffer, mvp, positions[1]);
   auto [screen2, ok2] = ProjectToScreen(frameBuffer, mvp, positions[2]);
   if (ok0 && ok1 && ok2)
   {
-    R_RasterTriangleFlat(frameBuffer, {screen0, screen1, screen2}, color);
+    R3D_RasterTriangleFlatCCW(frameBuffer, {screen0, screen1, screen2}, color);
   }
 }
 
@@ -174,7 +169,7 @@ inline void DrawWorldRect(R_FrameBuffer *frameBuffer, const Matrix4x4 &viewProje
 {
   if (auto [screen, ok] = ProjectToScreen(frameBuffer, viewProjection, world); ok)
   {
-    R_FillRect(frameBuffer, R_PointFrom2F32(screen) - size / 2, size, color);
+    R_FillRect(frameBuffer, R_PointFrom2F32(screen.xy) - size / 2, size, color);
   }
 }
 
@@ -183,7 +178,7 @@ inline void DrawWorldText(R_FrameBuffer *frameBuffer, const Matrix4x4 &viewProje
 {
   if (auto [screen, ok] = ProjectToScreen(frameBuffer, viewProjection, world); ok)
   {
-    R_PutStringAscii(frameBuffer, font, R_PointFrom2F32(screen), color, text);
+    R_PutStringAscii(frameBuffer, font, R_PointFrom2F32(screen.xy), color, text);
   }
 }
 
@@ -241,15 +236,30 @@ inline void DrawWorldAxes(R_FrameBuffer *frameBuffer, const Matrix4x4 &viewProje
   }
 }
 
-inline void DrawCube(R_FrameBuffer *frameBuffer, const Matrix4x4 &mvp)
+inline void DrawMesh(R_FrameBuffer *frameBuffer, const Matrix4x4 &mvp, Mesh mesh)
 {
-  for (usize i = 0; i < ArrayCount(CUBE); i += 3)
+  auto scratch = ScratchBegin();
+  Defer(ScratchEnd(scratch););
+
+  auto projected = ArenaPushSlice<Pair<Vector3<f32>, bool>>(scratch.arena, mesh.positions.count);
+  for (usize v = 0; v < mesh.positions.count; v += 1)
   {
-    auto color = R_PALETTE_VINIK24[(i / 3) % ArrayCount(R_PALETTE_VINIK24)];
-    DrawModelTriangleFlat(frameBuffer, mvp, {CUBE[i + 0], CUBE[i + 1], CUBE[i + 2]}, color);
-    // DrawWorldLine(frameBuffer, mvp, CUBE[i + 0], CUBE[i + 1], R_WHITE);
-    // DrawWorldLine(frameBuffer, mvp, CUBE[i + 1], CUBE[i + 2], R_WHITE);
-    // DrawWorldLine(frameBuffer, mvp, CUBE[i + 2], CUBE[i + 0], R_WHITE);
+    projected[v] = ProjectToScreen(frameBuffer, mvp, mesh.positions[v]);
+  }
+
+  for (usize i = 0; i < mesh.indices.count; i += 3)
+  {
+    auto [a, aOk] = projected[mesh.indices[i + 0]];
+    auto [b, bOk] = projected[mesh.indices[i + 1]];
+    auto [c, cOk] = projected[mesh.indices[i + 2]];
+    if (aOk && bOk && cOk)
+    {
+      auto color = R_PALETTE_VINIK24[(i / 3) % (ArrayCount(R_PALETTE_VINIK24) - 1)];
+      R3D_RasterTriangleFlatCCW(frameBuffer, {a, b, c}, color);
+      // R_RasterLine(frameBuffer, a.xy, b.xy, R_WHITE);
+      // R_RasterLine(frameBuffer, b.xy, c.xy, R_WHITE);
+      // R_RasterLine(frameBuffer, c.xy, a.xy, R_WHITE);
+    }
   }
 }
 
@@ -262,13 +272,17 @@ int main()
 
   auto arena = ArenaInit();
   auto frameBuffer = R_CreateFrameBuffer(&arena, windowSize / 2);
+
+  auto modelPath = Win32_PathFromExe(&arena, StringLit("../Suzanne/Suzanne.gltf"));
+  auto modelMesh = LoadMesh(&arena, modelPath.ptr);
+
   ShowWindow(hWnd, SW_SHOWMAXIMIZED);
 
   auto timeNow = Win32_NowNanoseconds();
   auto timeLast = timeNow;
 
   R3D_Camera camera = {.position = {1, 1, 4}};
-  f32 cubeAngle = 0;
+  f32 meshAngle = 0;
 
   for (; !g.windowState.destroyed;)
   {
@@ -280,13 +294,13 @@ int main()
     Win32_PollMessages(&g.inputState);
 
     CameraUpdate(&camera, frameTime);
-    cubeAngle += frameTime;
+    meshAngle += frameTime;
 
     {
       auto hDC = GetDC(hWnd);
       Defer(ReleaseDC(hWnd, hDC););
 
-      R_Clear(&frameBuffer, {0x44, 0x33, 0x22, 0xff});
+      R_Clear(&frameBuffer, {0x44, 0x33, 0x22, 0xff}, true);
       Defer(R_PresentFrameBuffer(hWnd, hDC, frameBuffer););
 
       // auto viewport = R_PresentViewport(g.windowState.clientSize, frameBuffer.size);
@@ -295,48 +309,17 @@ int main()
 
       auto frameBufferSize2F32 = R_PointFrom2I32(frameBuffer.size);
       auto aspectRatio = frameBufferSize2F32.width / frameBufferSize2F32.height;
-      auto projectionMatrix = WorldPerspectiveMatrix(RadiansFromDegreesF32(60), aspectRatio);
-      auto viewProjectionMatrix = projectionMatrix * R3D_CameraViewMatrix(&camera);
-      auto modelMatrix = Matrix4x4Translate({0, 1, 0}) *
-                         Matrix4x4RotationY(cubeAngle) *
-                         Matrix4x4Shear(0.5f, 0, 0, 0, 0, 0) *
-                         Matrix4x4Scale({2, 2, 2});
+      auto projection = WorldPerspectiveMatrix(RadiansFromDegreesF32(60), aspectRatio);
+      auto viewProjection = projection * R3D_CameraViewMatrix(&camera);
+      auto model = Matrix4x4Translate({0, 1, 0}) *
+                   Matrix4x4RotationY(meshAngle) *
+                   // Matrix4x4Shear(0.5f, 0, 0, 0, 0, 0) *
+                   Matrix4x4Scale({1, 1, 1});
 
-      DrawCube(&frameBuffer, viewProjectionMatrix * modelMatrix);
-      DrawWorldAxes(&frameBuffer, viewProjectionMatrix, R_FONT_3DFX);
+      DrawMesh(&frameBuffer, viewProjection * model, modelMesh);
+      DrawWorldAxes(&frameBuffer, viewProjection, R_FONT_3DFX);
     }
 
     // DwmFlush();
-  }
-}
-
-inline void RasterTriangleAscii(R_FrameBuffer *frameBuffer, R_BitmapFont font,
-                                const Vector2<f32> (&positions)[3], R_B8G8R8A8 color, u8 c)
-{
-  auto p0 = positions[0];
-  auto p1 = positions[1];
-  auto p2 = positions[2];
-
-  i32 leftMost = Minimum3(p0.x, p1.x, p2.x);
-  i32 rightMost = Maximum3(p0.x, p1.x, p2.x);
-  i32 topMost = Minimum3(p0.y, p1.y, p2.y);
-  i32 bottomMost = Maximum3(p0.y, p1.y, p2.y);
-
-  leftMost -= leftMost % font.glyphSize.width;
-  topMost -= topMost % font.glyphSize.height;
-
-  for (i32 y = topMost; y < bottomMost; y += font.glyphSize.height)
-  {
-    for (i32 x = leftMost; x < rightMost; x += font.glyphSize.width)
-    {
-      auto center = R_PointFrom2I32({x, y}) + R_PointFrom2I32(font.glyphSize) * 0.5f;
-      bool isIn = R_EdgeFunction(p0, p1, center) >= 0 &&
-                  R_EdgeFunction(p1, p2, center) >= 0 &&
-                  R_EdgeFunction(p2, p0, center) >= 0;
-      if (isIn)
-      {
-        R_PutChar(frameBuffer, font, {x, y}, color, c);
-      }
-    }
   }
 }

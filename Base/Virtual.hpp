@@ -12,19 +12,19 @@ struct Base_Globals
   SYSTEM_INFO win32SysInfo;
   INIT_ONCE win32SysInfoOnce;
 };
-inline Base_Globals base = {};
+inline Base_Globals baseGlobals = {};
 
 inline BOOL CALLBACK Win32_SysInfoInit(PINIT_ONCE, PVOID, PVOID *)
 {
-  GetSystemInfo(&base.win32SysInfo);
+  GetSystemInfo(&baseGlobals.win32SysInfo);
   return TRUE;
 }
 
 [[nodiscard]]
 inline const SYSTEM_INFO &Win32_SysInfo()
 {
-  InitOnceExecuteOnce(&base.win32SysInfoOnce, Win32_SysInfoInit, nullptr, nullptr);
-  return base.win32SysInfo;
+  InitOnceExecuteOnce(&baseGlobals.win32SysInfoOnce, Win32_SysInfoInit, nullptr, nullptr);
+  return baseGlobals.win32SysInfo;
 }
 
 [[nodiscard]]
