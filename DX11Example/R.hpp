@@ -91,7 +91,8 @@ inline void R_PushRect(DX11_GPU gpu, R_Batch *batch,
 
 inline void R_PushImage(DX11_GPU gpu, R_Batch *batch,
                         Vector2<f32> position, Vector2<f32> size,
-                        Vector4<u8> color = {255, 255, 255, 255}, f32 cornerRadius = 0, f32 borderThickness = 0)
+                        Vector4<u8> color = {255, 255, 255, 255},
+                        f32 cornerRadius = 0, f32 borderThickness = 0)
 {
   R_Instance instance = {
     .position = position,

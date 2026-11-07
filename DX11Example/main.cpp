@@ -79,39 +79,14 @@ void UpdateTitle(HWND hWnd, f32 frameTime)
   frameCounter += 1;
 }
 
-[[nodiscard]]
-String WallLine(Arena_Allocator *arena, u64 lineIndex, usize maxChars)
-{
-  // JetBrains Mono has Latin, Greek and Cyrillic
-  const char *GREETINGS[] = {"Merhaba", "Grüß Gott", "Bonjour", "¡Hola!", "Olá", "Cześć", "Dobrý den", "Szia",
-                             "Bună ziua", "Hallå", "Tere", "Labas", "Sveiki", "Dobar dan", "Xin chào",
-                             "Γειά σου", "Καλημέρα", "Привет", "Здравствуйте", "Добрий день", "Сайн уу"};
-
-  auto random = RandomInit(lineIndex);
-  auto line = FixedListInit(ArenaPushSlice<char>(arena, maxChars));
-  for (;;)
-  {
-    auto wordIndex = RandomBelowU32(&random, static_cast<u32>(ArrayCount(GREETINGS)));
-    String word = StringFromC(GREETINGS[wordIndex]);
-    if (line.count + word.count + 1 > maxChars)
-    {
-      break;
-    }
-    FixedListAppend(&line, word);
-    FixedListAppend(&line, StringLit(" "));
-  }
-  return SliceFromFixedList(line);
-}
-
 int main()
 {
-  SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-
+  // SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
   auto com = Win32_InitComOnThread(Com_Apartment_SingleThreaded);
   Defer(Win32_UninitComOnThread(&com););
 
   auto [classId, classOk] = Win32_RegisterWindowClass(StringLit("DX11ExampleClass"), ExampleWndProc);
-  auto hWnd = Win32_CreateWindow(classId, StringLit("DX11Example"), {1280, 720}, Window_Kind_Normal, WS_EX_NOREDIRECTIONBITMAP);
+  auto hWnd = Win32_CreateWindow(classId, StringLit("DX11Example"), {1600, 900}, Window_Kind_Normal, WS_EX_NOREDIRECTIONBITMAP);
   Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic);
   Win32_SetWindowCorners(hWnd, Window_Corners_RoundSmall);
 
@@ -168,20 +143,8 @@ int main()
         Win32_DWriteReleaseCollection(dwrite, &fontFiles);
         Win32_ReleaseDWrite(&dwrite););
 
-  f32 basePixelSize = 16;
-  u32 fontDpi = 0;
-  f32 pixelSize = 0;
-  Font_Metrics fontMetrics = {};
-  f32 charAdvance = 0;
-
-  f32 scroll = 0;
-  f32 scrollSpeed = 30;
-  bool paused = false;
   bool showImage = true;
   Debug_UI debug = {.panelPosition = {16, 16}};
-  auto typed = FixedListInit(ArenaPushSlice<char>(&arena, 256));
-  bool fullscreen = false;
-  Win32_Windowed_Placement windowed = {};
 
   // ShowWindow(hWnd, SW_SHOWMAXIMIZED);
   ShowWindow(hWnd, SW_SHOW);
@@ -196,62 +159,10 @@ int main()
 
     DX11_WaitForBetterLatency(swapchain); // call it before handling input
     Win32_PollMessages(&g.inputState);
-    Vector2<u32> swapchainTargetSize = {static_cast<u32>(g.windowState.clientSize.width),
-                                        static_cast<u32>(g.windowState.clientSize.height)};
-    DX11_ResizeSwapchain(gpu, &swapchain, swapchainTargetSize);
+    Vector2<u32> swapchainSize = {static_cast<u32>(g.windowState.clientSize.width),
+                                  static_cast<u32>(g.windowState.clientSize.height)};
+    DX11_ResizeSwapchain(gpu, &swapchain, swapchainSize);
 
-    auto dpiScale = static_cast<f32>(g.windowState.dpi) / USER_DEFAULT_SCREEN_DPI;
-    if (g.windowState.dpi != fontDpi)
-    {
-      fontDpi = g.windowState.dpi;
-      pixelSize = basePixelSize * dpiScale;
-      fontMetrics = Win32_DWriteFontMetrics(font, pixelSize);
-
-      auto scratch = ScratchBegin();
-      Defer(ScratchEnd(scratch););
-
-      auto shapedGlyph = Win32_DWriteShapeText(scratch.arena, dwrite, font, pixelSize, StringLit("B"));
-      charAdvance = RoundHalfDownF32(shapedGlyph[0].advance);
-    }
-
-    if (Win32_KeyPressed(&g.inputState, VK_F11))
-    {
-      fullscreen = !fullscreen;
-      if (fullscreen)
-      {
-        windowed = Win32_EnterFullscreen(hWnd);
-      }
-      else
-      {
-        Win32_ExitFullscreen(hWnd, windowed);
-      }
-    }
-    if (!paused)
-    {
-      scroll += frameTime * scrollSpeed * dpiScale;
-    }
-    scroll -= g.inputState.wheelDelta.y * 3 * fontMetrics.lineHeightRounded;
-    scroll = Maximum(scroll, 0.0f);
-
-    for (auto decoded : StringRunes(SliceFromFixedList(g.inputState.textWithCtrlChars)))
-    {
-      switch (decoded.rune)
-      {
-      case '\b':
-        typed.count -= Utf8DecodeRuneBefore(SliceFromFixedList(typed), typed.count).size;
-        break;
-      case '\n':
-        FixedListClear(&typed);
-        break;
-      case '\t':
-        break;
-      default:
-        Utf8AppendWholeRune(&typed, decoded.rune);
-        break;
-      }
-    }
-
-    auto swapchainSize = DX11_GetSwapchainSize(swapchain);
     {
       R_Constants constantsFrame = {
         .gammaRatios = blendParams.gammaRatios,
@@ -275,51 +186,14 @@ int main()
       context->PSSetSamplers(0, 1, &sampler);
       context->OMSetBlendState(blend, nullptr, 0xFFFFFFFF);
 
-      auto scratch = ScratchBegin();
-      Defer(ScratchEnd(scratch););
-
       Vector2<f32> screenSize = constantsFrame.screenSize;
-
-      f32 margin = 8 * dpiScale;
-      f32 lineHeight = fontMetrics.lineHeightRounded;
-      auto charsPerLine = static_cast<usize>((screenSize.width - margin * 2) / charAdvance);
-
-      auto firstLine = static_cast<usize>(scroll / lineHeight);
-      f32 lineOffset = scroll - firstLine * lineHeight;
-      auto visibleLines = static_cast<usize>(screenSize.height / lineHeight) + 2;
-      for (usize i = 0; i < visibleLines; i += 1)
-      {
-        f32 lineTop = i * lineHeight - lineOffset;
-        bool hovered = g.inputState.mouseInsideClient &&
-                       g.inputState.mousePosition.y >= lineTop &&
-                       g.inputState.mousePosition.y < lineTop + lineHeight;
-        if (hovered)
-        {
-          R_PushRect(gpu, &batch, {0, lineTop}, {screenSize.width, lineHeight}, {255, 255, 255, 40});
-        }
-        String line = WallLine(scratch.arena, firstLine + i, charsPerLine);
-        Vector4<u8> color = PALETTE_VINIK24[(firstLine + i) % ArrayCount(PALETTE_VINIK24)];
-        Vector2<f32> pen = {margin, lineTop + fontMetrics.ascent};
-        R_PushText(gpu, &batch, &atlas, atlasTexture, dwrite, pen, font, pixelSize, color, line);
-      }
 
       if (showImage)
       {
         f32 imageHeight = screenSize.height * 0.6f;
         Vector2<f32> imageSize = {imageHeight * imageAspect, imageHeight};
-        R_PushImage(gpu, &batch, (screenSize - imageSize) / 2.0f, imageSize, {255, 255, 255, 255}, 24 * dpiScale);
+        R_PushImage(gpu, &batch, (screenSize - imageSize) / 2.0f, imageSize, {255, 255, 255, 255}, 24);
       }
-
-      f32 barHeight = lineHeight + margin * 2;
-      f32 barTop = screenSize.height - barHeight;
-      R_PushRect(gpu, &batch, {0, barTop}, {screenSize.width, barHeight}, {0, 0, 0, 200});
-      String prompt = StringFmt(scratch.arena, "> %.*s_", StringArgs(SliceFromFixedList(typed)));
-      if (typed.count == 0)
-      {
-        prompt = StringLit("> type smth, F11 fullscreen");
-      }
-      Vector2<f32> promptPen = {margin, barTop + margin + fontMetrics.ascent};
-      R_PushText(gpu, &batch, &atlas, atlasTexture, dwrite, promptPen, font, pixelSize, {255, 255, 255, 255}, prompt);
 
       {
         Debug_Renderer debugRenderer = {
@@ -329,24 +203,12 @@ int main()
           .atlasTexture = atlasTexture,
           .dwrite = dwrite,
           .font = font,
-          .fontSize = pixelSize,
-          .dpiScale = dpiScale,
         };
         Debug_Begin(&debug, &g.inputState, debugRenderer, StringLit("Debug"));
 
-        Debug_Label(&debug, StringFmt(scratch.arena, "Scroll %.0f px", scroll));
-        Debug_Checkbox(&debug, &paused, StringLit("Paused"));
         Debug_Checkbox(&debug, &showImage, StringLit("Show image"));
-        Debug_SliderF32(&debug, &scrollSpeed, 0, 300, StringFmt(scratch.arena, "Scroll speed %.0f", scrollSpeed));
-        if (Debug_Button(&debug, StringLit("Back to top")))
-        {
-          scroll = 0;
-        }
         auto debugHasMouse = Debug_End(&debug);
-        if (!debugHasMouse && Win32_ButtonPressed(&g.inputState, Mouse_Button_Left))
-        {
-          paused = !paused;
-        }
+        (void)debugHasMouse;
       }
 
       R_Flush(gpu, &batch);

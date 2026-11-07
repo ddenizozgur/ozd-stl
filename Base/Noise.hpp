@@ -37,7 +37,7 @@ inline constexpr u64 NOISE_PRIME_Y = 0x598CD327003817B5;
 [[nodiscard]]
 inline f32 NoiseCorner2D(u64 seed, u64 cornerX, u64 cornerY, Vector2<f32> delta)
 {
-  f32 falloff = 0.5f - LengthSquared(delta);
+  f32 falloff = 0.5f - LengthSquaredF32(delta);
   if (falloff <= 0)
   {
     return 0;
@@ -48,7 +48,7 @@ inline f32 NoiseCorner2D(u64 seed, u64 cornerX, u64 cornerY, Vector2<f32> delta)
   return (falloff * falloff) * (falloff * falloff) * DotProduct(gradient, delta);
 }
 
-// about [-1, 1], the same seed and position always give the same value
+// [-1, 1]
 [[nodiscard]]
 inline f32 Noise2D(u64 seed, Vector2<f32> position)
 {

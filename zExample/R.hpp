@@ -4,7 +4,6 @@
 #include "../Base/Unicode.hpp"
 #include "R_FontTer14.hpp"
 #include "R_Fonts.hpp"
-#include <math.h>
 
 #pragma comment(lib, "gdi32")
 
@@ -62,6 +61,33 @@ inline constexpr R_B8G8R8A8 R_MAGENTA = {255, 0, 255, 255};
 inline constexpr R_B8G8R8A8 R_DARK_MAGENTA = {128, 0, 128, 255};
 inline constexpr R_B8G8R8A8 R_VERY_DARK_MAGENTA = {64, 0, 64, 255};
 
+inline constexpr R_B8G8R8A8 R_PALETTE_VINIK24[] = {
+  {0x76, 0x67, 0x6f, 0xff},
+  {0x97, 0x9a, 0x9a, 0xff},
+  {0xb8, 0xcc, 0xc5, 0xff},
+  {0x80, 0x55, 0x8b, 0xff},
+  {0x90, 0x88, 0xc3, 0xff},
+  {0xa5, 0x93, 0xa5, 0xff},
+  {0x92, 0x60, 0x66, 0xff},
+  {0x50, 0x4f, 0x9a, 0xff},
+  {0x75, 0x8d, 0xc2, 0xff},
+  {0xc0, 0xa1, 0x7c, 0xff},
+  {0xa3, 0x6a, 0x41, 0xff},
+  {0x68, 0x62, 0x8d, 0xff},
+  {0x5c, 0x95, 0xbe, 0xff},
+  {0xa9, 0xac, 0x68, 0xff},
+  {0x80, 0x70, 0x38, 0xff},
+  {0x62, 0x69, 0x6e, 0xff},
+  {0x67, 0xa1, 0x93, 0xff},
+  {0x78, 0xaa, 0x6e, 0xff},
+  {0x64, 0x70, 0x55, 0xff},
+  {0x7f, 0x9f, 0x9d, 0xff},
+  {0x99, 0x9e, 0x7e, 0xff},
+  {0x72, 0x68, 0x5d, 0xff},
+  {0x55, 0x34, 0x43, 0xff},
+  {0x00, 0x00, 0x00, 0xff},
+};
+
 struct R_FrameBuffer
 {
   Slice<R_B8G8R8A8> data;
@@ -80,6 +106,22 @@ inline R_FrameBuffer R_CreateFrameBuffer(Arena_Allocator *arena, Vector2<i32> si
   return {data, size};
 }
 
+struct R_Viewport
+{
+  Vector2<i32> position;
+  Vector2<i32> size;
+};
+
+[[nodiscard]]
+inline R_Viewport R_PresentViewport(Vector2<i32> clientSize, Vector2<i32> frameBufferSize)
+{
+  i32 scale = Minimum(clientSize.width / frameBufferSize.width,
+                      clientSize.height / frameBufferSize.height);
+  scale = Maximum(scale, 1);
+  auto size = frameBufferSize * scale;
+  return {(clientSize - size) / 2, size};
+}
+
 inline void R_PresentFrameBuffer(HWND hWnd, HDC hDC, R_FrameBuffer frameBuffer)
 {
   RECT client;
@@ -87,13 +129,11 @@ inline void R_PresentFrameBuffer(HWND hWnd, HDC hDC, R_FrameBuffer frameBuffer)
   i32 clientW = client.right - client.left;
   i32 clientH = client.bottom - client.top;
 
-  i32 scale = Minimum(clientW / frameBuffer.size.width,
-                      clientH / frameBuffer.size.height);
-  scale = Maximum(scale, 1);
-  i32 dstW = frameBuffer.size.width * scale;
-  i32 dstH = frameBuffer.size.height * scale;
-  i32 dstX = (clientW - dstW) / 2;
-  i32 dstY = (clientH - dstH) / 2;
+  auto viewport = R_PresentViewport({clientW, clientH}, frameBuffer.size);
+  i32 dstW = viewport.size.width;
+  i32 dstH = viewport.size.height;
+  i32 dstX = viewport.position.x;
+  i32 dstY = viewport.position.y;
 
   // black bars around the image
   PatBlt(hDC, 0, 0, clientW, dstY, BLACKNESS);
@@ -116,11 +156,17 @@ inline void R_PresentFrameBuffer(HWND hWnd, HDC hDC, R_FrameBuffer frameBuffer)
 }
 
 [[nodiscard]]
-inline Vector2<i32> R_PositionFrom(Vector2<f32> point)
+inline Vector2<i32> R_PointFrom2F32(Vector2<f32> point)
 {
   i32 x = RoundHalfDownF32(point.x);
   i32 y = RoundHalfDownF32(point.y);
   return {x, y};
+}
+
+[[nodiscard]]
+constexpr Vector2<f32> R_PointFrom2I32(Vector2<i32> point)
+{
+  return {static_cast<f32>(point.x), static_cast<f32>(point.y)};
 }
 
 [[nodiscard]]
@@ -443,6 +489,160 @@ inline void R_HexDump(R_FrameBuffer *frameBuffer, R_BitmapFont font, Vector2<i32
       u8 value = bytes[i];
       R_PrintFmtAscii(frameBuffer, font, cursor, value == 0 ? R_CGA_LIGHT_GRAY : R_CGA_WHITE, "%02x", value);
       cursor.x += 3 * font.glyphSize.width;
+    }
+  }
+}
+
+[[nodiscard]]
+constexpr Vector2<f32> R_PositionToNDC(Vector2<f32> position, R_Viewport viewport)
+{
+  return ((position - R_PointFrom2I32(viewport.position)) / R_PointFrom2I32(viewport.size)) * 2 - 1;
+}
+
+[[nodiscard]]
+constexpr Vector2<f32> R_NDCToPosition(Vector2<f32> ndc, R_Viewport viewport)
+{
+  return ((ndc + 1) / 2) * R_PointFrom2I32(viewport.size) + R_PointFrom2I32(viewport.position);
+}
+
+[[nodiscard]]
+constexpr f32 R_EdgeFunction(Vector2<f32> a, Vector2<f32> b, Vector2<f32> point)
+{
+  auto edge = b - a;
+  auto toPoint = point - a;
+  return edge.x * toPoint.y - edge.y * toPoint.x;
+}
+
+inline void R_RasterLine(R_FrameBuffer *frameBuffer, Vector2<f32> a, Vector2<f32> b, R_B8G8R8A8 color)
+{
+  auto frameBufferSize2F32 = R_PointFrom2I32(frameBuffer->size);
+
+  auto delta = b - a;
+  if (fabsf(delta.x) >= fabsf(delta.y))
+  {
+    auto start = a.x < b.x ? a : b;
+    auto end = a.x < b.x ? b : a;
+    f32 slope = (end.y - start.y) / (end.x - start.x);
+
+    i32 first = RoundHalfDownF32(Clamp(start.x, 0.0f, frameBufferSize2F32.x));
+    i32 last = RoundHalfDownF32(Clamp(end.x, 0.0f, frameBufferSize2F32.x));
+    for (i32 x = first; x < last; x += 1)
+    {
+      i32 y = FloorF32(start.y + slope * (x + 0.5f - start.x));
+      R_Plot(frameBuffer, {x, y}, color);
+    }
+  }
+  else
+  {
+    auto start = a.y < b.y ? a : b;
+    auto end = a.y < b.y ? b : a;
+    f32 slope = (end.x - start.x) / (end.y - start.y);
+
+    i32 first = RoundHalfDownF32(Clamp(start.y, 0.0f, frameBufferSize2F32.y));
+    i32 last = RoundHalfDownF32(Clamp(end.y, 0.0f, frameBufferSize2F32.y));
+    for (i32 y = first; y < last; y += 1)
+    {
+      i32 x = FloorF32(start.x + slope * (y + 0.5f - start.y));
+      R_Plot(frameBuffer, {x, y}, color);
+    }
+  }
+}
+
+inline void R_RasterTriangleFlat(R_FrameBuffer *frameBuffer,
+                                 const Vector2<f32> (&positions)[3],
+                                 R_B8G8R8A8 color)
+{
+  auto p0 = positions[0];
+  auto p1 = positions[1];
+  auto p2 = positions[2];
+
+  auto areaTimes2 = R_EdgeFunction(p0, p1, p2);
+  if (areaTimes2 <= 0)
+  {
+    return;
+  }
+
+  auto leftMost = Minimum3(p0.x, p1.x, p2.x);
+  auto rightMost = Maximum3(p0.x, p1.x, p2.x);
+  auto topMost = Minimum3(p0.y, p1.y, p2.y);
+  auto bottomMost = Maximum3(p0.y, p1.y, p2.y);
+
+  auto frameBufferSize2F32 = R_PointFrom2I32(frameBuffer->size);
+  i32 left = RoundHalfDownF32(Clamp(leftMost, 0.0f, frameBufferSize2F32.x));
+  i32 right = RoundHalfDownF32(Clamp(rightMost, 0.0f, frameBufferSize2F32.x));
+  i32 top = RoundHalfDownF32(Clamp(topMost, 0.0f, frameBufferSize2F32.y));
+  i32 bottom = RoundHalfDownF32(Clamp(bottomMost, 0.0f, frameBufferSize2F32.y));
+
+  auto pixels = frameBuffer->data.ptr;
+  usize width = frameBuffer->size.width;
+
+  for (i32 y = top; y < bottom; y += 1)
+  {
+    auto row = pixels + y * width;
+    for (i32 x = left; x < right; x += 1)
+    {
+      auto center = R_PointFrom2I32({x, y}) + Vector2<f32>{0.5, 0.5};
+      bool isInside = R_EdgeFunction(p1, p2, center) >= 0 &&
+                      R_EdgeFunction(p2, p0, center) >= 0 &&
+                      R_EdgeFunction(p0, p1, center) >= 0;
+      if (isInside)
+      {
+        row[x] = color;
+      }
+    }
+  }
+}
+
+inline void R_RasterTriangleGouraud(R_FrameBuffer *frameBuffer,
+                                    const Vector2<f32> (&positions)[3],
+                                    const R_B8G8R8A8 (&colors)[3])
+{
+  auto p0 = positions[0];
+  auto p1 = positions[1];
+  auto p2 = positions[2];
+
+  auto areaTimes2 = R_EdgeFunction(p0, p1, p2);
+  if (areaTimes2 <= 0)
+  {
+    return;
+  }
+
+  auto leftMost = Minimum3(p0.x, p1.x, p2.x);
+  auto rightMost = Maximum3(p0.x, p1.x, p2.x);
+  auto topMost = Minimum3(p0.y, p1.y, p2.y);
+  auto bottomMost = Maximum3(p0.y, p1.y, p2.y);
+
+  auto frameBufferSize2F32 = R_PointFrom2I32(frameBuffer->size);
+  i32 left = RoundHalfDownF32(Clamp(leftMost, 0.0f, frameBufferSize2F32.x));
+  i32 right = RoundHalfDownF32(Clamp(rightMost, 0.0f, frameBufferSize2F32.x));
+  i32 top = RoundHalfDownF32(Clamp(topMost, 0.0f, frameBufferSize2F32.y));
+  i32 bottom = RoundHalfDownF32(Clamp(bottomMost, 0.0f, frameBufferSize2F32.y));
+
+  auto pixels = frameBuffer->data.ptr;
+  usize width = frameBuffer->size.width;
+
+  auto c0 = colors[0];
+  auto c1 = colors[1];
+  auto c2 = colors[2];
+  auto oneOverAreaTimes2 = 1 / areaTimes2; // dont needed when -ffast-math
+
+  for (i32 y = top; y < bottom; y += 1)
+  {
+    auto row = pixels + y * width;
+    for (i32 x = left; x < right; x += 1)
+    {
+      auto center = R_PointFrom2I32({x, y}) + Vector2<f32>{0.5, 0.5};
+      auto w0 = R_EdgeFunction(p1, p2, center) * oneOverAreaTimes2;
+      auto w1 = R_EdgeFunction(p2, p0, center) * oneOverAreaTimes2;
+      auto w2 = R_EdgeFunction(p0, p1, center) * oneOverAreaTimes2;
+
+      if (bool isInside = w0 >= 0 && w1 >= 0 && w2 >= 0; isInside)
+      {
+        row[x].data[0] = RoundHalfUpF32(w0 * c0.data[0] + w1 * c1.data[0] + w2 * c2.data[0]);
+        row[x].data[1] = RoundHalfUpF32(w0 * c0.data[1] + w1 * c1.data[1] + w2 * c2.data[1]);
+        row[x].data[2] = RoundHalfUpF32(w0 * c0.data[2] + w1 * c1.data[2] + w2 * c2.data[2]);
+        row[x].data[3] = RoundHalfUpF32(w0 * c0.data[3] + w1 * c1.data[3] + w2 * c2.data[3]);
+      }
     }
   }
 }

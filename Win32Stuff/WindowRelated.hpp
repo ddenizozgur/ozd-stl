@@ -281,7 +281,7 @@ struct Win32_Input_State
   u8 buttonsPressed;
   u8 buttonsReleased;
   bool mouseInsideClient;
-  Vector2<f32> mousePosition; // client pixels, top-left origin
+  Vector2<i32> mousePosition; // client pixels, top-left origin
   Vector2<f32> wheelDelta;
   char textStorage[256];
   Fixed_List<char> textWithCtrlChars; // UTF-8, ctrl chars are \b \t \n.
@@ -447,7 +447,7 @@ inline void Win32_InputStateOnMessage(Win32_Input_State *inputState, HWND hWnd, 
     break;
 
   case WM_MOUSEMOVE:
-    inputState->mousePosition = {static_cast<f32>(GET_X_LPARAM(lParam)), static_cast<f32>(GET_Y_LPARAM(lParam))};
+    inputState->mousePosition = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
     if (!inputState->mouseInsideClient)
     {
       TRACKMOUSEEVENT track = {.cbSize = sizeof(track), .dwFlags = TME_LEAVE, .hwndTrack = hWnd};

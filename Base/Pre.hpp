@@ -51,6 +51,7 @@
 #endif
 
 #if IS_COMPILER_CLANG
+#pragma clang diagnostic ignored "-Wmissing-braces"
 #if __has_warning("-Wmissing-designated-field-initializers")
 #pragma clang diagnostic ignored "-Wmissing-designated-field-initializers"
 #endif

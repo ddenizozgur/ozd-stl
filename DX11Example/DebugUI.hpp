@@ -24,8 +24,8 @@ struct Debug_Renderer
   DX11_Texture2D atlasTexture;
   Win32_DWrite dwrite;
   Win32_DWrite_Font font;
-  f32 fontSize;
-  f32 dpiScale;
+  f32 fontSize = 16;
+  f32 dpiScale = 1;
 };
 
 struct Debug_UI
@@ -102,9 +102,15 @@ inline constexpr Vector4<u8> DEBUG_COLOR_TRACK_HOT = {44, 44, 44, 255};
   return id;
 }
 
-[[nodiscard]] constexpr bool Debug_MouseIn_(const Debug_UI *ui, Debug_Rect rect)
+[[nodiscard]] constexpr Vector2<f32> Debug_MousePosition_(const Debug_UI *ui)
 {
   auto mouse = ui->input->mousePosition;
+  return {static_cast<f32>(mouse.x), static_cast<f32>(mouse.y)};
+}
+
+[[nodiscard]] constexpr bool Debug_MouseIn_(const Debug_UI *ui, Debug_Rect rect)
+{
+  auto mouse = Debug_MousePosition_(ui);
   auto rectRightBottom = rect.position + rect.size;
   return ui->input->mouseInsideClient &&
          mouse.x >= rect.position.x && mouse.x < rectRightBottom.x &&
@@ -192,11 +198,11 @@ inline void Debug_Begin(Debug_UI *ui, const Win32_Input_State *input, Debug_Rend
   auto interaction = Debug_Interact_(ui, titleId, {ui->panelPosition, {width, titleHeight}});
   if (interaction.pressed)
   {
-    ui->grabOffset = input->mousePosition - ui->panelPosition;
+    ui->grabOffset = Debug_MousePosition_(ui) - ui->panelPosition;
   }
   if (interaction.active)
   {
-    ui->panelPosition = input->mousePosition - ui->grabOffset;
+    ui->panelPosition = Debug_MousePosition_(ui) - ui->grabOffset;
   }
 
   Debug_Rect_(ui, {ui->panelPosition, {width, titleHeight}}, DEBUG_COLOR_TITLE);
@@ -276,7 +282,7 @@ inline bool Debug_SliderF32_(Debug_UI *ui, const void *callSite, f32 *value, f32
   f32 old = *value;
   if (interaction.active)
   {
-    f32 t = Clamp((ui->input->mousePosition.x - row.position.x) / row.size.width, 0.0f, 1.0f);
+    f32 t = Clamp((Debug_MousePosition_(ui).x - row.position.x) / row.size.width, 0.0f, 1.0f);
     *value = LerpF32(min, max, t);
   }
 
