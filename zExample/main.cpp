@@ -79,7 +79,7 @@ inline Mesh LoadMesh(Arena_Allocator *arena, String path)
     .positions = GLTF_LoadPositions(arena, primitive),
     .texcoords = GLTF_LoadTexcoords(arena, primitive, 0),
     .indices = GLTF_LoadIndices(arena, primitive),
-    .albedo = GLTF_LoadAlbedo(arena, primitive, path),
+    .albedo = GLTF_LoadAlbedo(arena, primitive, Image_Format_BGRA8, path),
   };
 }
 

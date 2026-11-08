@@ -31,7 +31,8 @@ GLTF_ImageBytesFrom(Arena_Allocator *arena, const cgltf_image *image, String glt
 
 [[nodiscard]]
 inline Pair<Image, bool>
-GLTF_LoadAlbedo(Arena_Allocator *arena, const cgltf_primitive *primitive, String gltfPath)
+GLTF_LoadAlbedo(Arena_Allocator *arena, const cgltf_primitive *primitive,
+                Image_Format decodeAs, String gltfPath)
 {
   auto material = primitive->material;
   if (material == nullptr)
@@ -57,7 +58,7 @@ GLTF_LoadAlbedo(Arena_Allocator *arena, const cgltf_primitive *primitive, String
   {
     return {};
   }
-  return Win32_WicDecodeImageAs(arena, bytes, Image_Format_BGRA8);
+  return Win32_WicDecodeImageAs(arena, bytes, decodeAs);
 }
 
 [[nodiscard]]
