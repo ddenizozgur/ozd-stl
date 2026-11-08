@@ -139,7 +139,7 @@ inline void CameraUpdate(R3D_Camera *camera, f32 frameTime)
 }
 
 [[nodiscard]]
-inline Pair<Vector3<f32>, bool> ProjectToScreen(const R_FrameBuffer *frameBuffer,
+inline Pair<Vector4<f32>, bool> ProjectToScreen(const R_FrameBuffer *frameBuffer,
                                                 const Matrix4x4 &toClip, Vector3<f32> position)
 {
   Vector4<f32> point = {.w = 1};
@@ -150,9 +150,10 @@ inline Pair<Vector3<f32>, bool> ProjectToScreen(const R_FrameBuffer *frameBuffer
   {
     return {};
   }
-  Vector2<f32> screen = R_NDCToPosition(clip.xy / clip.w, {.position = {}, .size = frameBuffer->size});
-  f32 depth = clip.z / clip.w;
-  return {{screen.x, screen.y, depth}, true};
+  f32 oneOverW = 1 / clip.w;
+  Vector2<f32> screen = R_NDCToPosition(clip.xy * oneOverW, {.position = {}, .size = frameBuffer->size});
+  f32 depth = clip.z * oneOverW;
+  return {{screen.x, screen.y, depth, oneOverW}, true};
 }
 
 inline void DrawWorldRect(R_FrameBuffer *frameBuffer, const Matrix4x4 &viewProjection,
@@ -231,18 +232,18 @@ inline void DrawWorldAxes(R_FrameBuffer *frameBuffer, const Matrix4x4 &viewProje
 using Mesh_Draw_Kind = u32;
 enum : Mesh_Draw_Kind
 {
-  Mesh_Draw_Kind_Normal,
+  Mesh_Draw_Kind_Default,
   Mesh_Draw_Kind_PS1,
   Mesh_Draw_Kind_Debug,
 };
 
 inline void DrawMesh(R_FrameBuffer *frameBuffer, const Matrix4x4 &mvp,
-                     Mesh mesh, Mesh_Draw_Kind drawKind = Mesh_Draw_Kind_PS1)
+                     Mesh mesh, Mesh_Draw_Kind drawKind = Mesh_Draw_Kind_Default)
 {
   auto scratch = ScratchBegin();
   Defer(ScratchEnd(scratch););
 
-  auto projected = ArenaPushSlice<Pair<Vector3<f32>, bool>>(scratch.arena, mesh.positions.count);
+  auto projected = ArenaPushSlice<Pair<Vector4<f32>, bool>>(scratch.arena, mesh.positions.count);
   for (usize i = 0; i < mesh.positions.count; i += 1)
   {
     projected[i] = ProjectToScreen(frameBuffer, mvp, mesh.positions[i]);
@@ -260,11 +261,16 @@ inline void DrawMesh(R_FrameBuffer *frameBuffer, const Matrix4x4 &mvp,
 
     if (aOk && bOk && cOk)
     {
-      Vector3<f32> positions[3] = {a, b, c};
+      Vector4<f32> positions[3] = {a, b, c};
       switch (drawKind)
       {
-      case Mesh_Draw_Kind_Normal:
-        assert(false && "not implemented yet");
+      case Mesh_Draw_Kind_Default:
+        if (mesh.albedo.second)
+        {
+          Vector2<f32> texcoords[3] = {mesh.texcoords[i0], mesh.texcoords[i1], mesh.texcoords[i2]};
+          R3D_RasterTriangleCCW(frameBuffer, &mesh.albedo.first, {positions, texcoords});
+          break;
+        }
       case Mesh_Draw_Kind_PS1:
         if (mesh.albedo.second)
         {
@@ -275,70 +281,12 @@ inline void DrawMesh(R_FrameBuffer *frameBuffer, const Matrix4x4 &mvp,
       case Mesh_Draw_Kind_Debug:
       {
         auto color = R_PALETTE_VINIK24[(i / 3) % (ArrayCount(R_PALETTE_VINIK24) - 1)];
-        R3D_RasterTriangleFlatCCW(frameBuffer, positions, color);
+        R3D_RasterTriangleFlatCCW(frameBuffer, {a.xyz, b.xyz, c.xyz}, color);
         break;
       }
       default:
         break;
       }
-    }
-  }
-}
-
-inline void RasterImage(R_FrameBuffer *frameBuffer, const Image *image,
-                        Rect<i32> srcRect, Rect<i32> dstRect)
-{
-  assert(image->format == Image_Format_BGRA8 && "Image must be decoded as Image_Format_BGRA8");
-
-  auto imageSize = Vector2Cast<i32>(image->size);
-  if (srcRect.width <= 0 || srcRect.height <= 0)
-  {
-    srcRect.position = {};
-    srcRect.size = imageSize;
-  }
-
-  auto bottomRight = dstRect.position + dstRect.size;
-  i32 left = Maximum(0, dstRect.x);
-  i32 right = Minimum(bottomRight.x, frameBuffer->size.width);
-  i32 top = Maximum(0, dstRect.y);
-  i32 bottom = Minimum(bottomRight.y, frameBuffer->size.height);
-  if (left >= right)
-  {
-    return;
-  }
-
-  usize fbWidth = frameBuffer->size.width;
-  i32 imagePitch = imageSize.width;
-
-  auto srcPixels = reinterpret_cast<const R_B8G8R8A8 *>(image->pixels.ptr);
-  srcPixels += srcRect.y * imagePitch + srcRect.x;
-
-  f32 dstStartX = static_cast<f32>(dstRect.x);
-  f32 dstEndX = static_cast<f32>(bottomRight.x);
-  f32 dstStartY = static_cast<f32>(dstRect.y);
-  f32 dstEndY = static_cast<f32>(bottomRight.y);
-  auto dstPixels = frameBuffer->colorData.ptr;
-
-  auto scratch = ScratchBegin();
-  Defer(ScratchEnd(scratch););
-
-  auto srcColumns = ArenaPushSlice<i32>(scratch.arena, right - left);
-  for (i32 x = left; x < right; x += 1)
-  {
-    f32 u = InverseLerpF32(dstStartX, dstEndX, x + 0.5f);
-    srcColumns[x - left] = FloorF32(u * srcRect.width);
-  }
-
-  for (i32 y = top; y < bottom; y += 1)
-  {
-    auto row = dstPixels + y * fbWidth + left;
-    f32 v = InverseLerpF32(dstStartY, dstEndY, y + 0.5f);
-    i32 srcY = FloorF32(v * srcRect.height);
-    auto srcRow = srcPixels + srcY * imagePitch;
-
-    for (usize i = 0; i < srcColumns.count; i += 1)
-    {
-      row[i] = srcRow[srcColumns[i]];
     }
   }
 }
@@ -354,9 +302,8 @@ int main()
   Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic, true);
 
   auto arena = ArenaInit();
-  auto frameBuffer = R_CreateFrameBuffer(&arena, windowSize);
+  auto frameBuffer = R_CreateFrameBuffer(&arena, windowSize / 2);
 
-  // auto modelPath = Win32_PathFromExe(&arena, StringLit("../Chair/chair.gltf"));
   auto modelPath = Win32_PathFromExe(&arena, StringLit("../Suzanne/Suzanne.gltf"));
   auto modelMesh = LoadMesh(&arena, modelPath);
 
@@ -387,9 +334,7 @@ int main()
       R_Clear(&frameBuffer, {0x44, 0x33, 0x22, 0xff}, true);
       Defer(R_PresentFrameBuffer(hWnd, hDC, frameBuffer););
 
-      // auto viewport = R_PresentViewport(g.windowState.clientSize, frameBuffer.size);
-      // auto mouseNDC = R_PositionToNDC(Vector2Cast<f32>(g.inputState.mousePosition), viewport);
-      // auto mouse2F32 = R_NDCToPosition(mouseNDC, {{}, frameBuffer.size});
+      R_HexDump(&frameBuffer, R_FONT_3DFX, {}, (void *)main, 16, 48);
 
       auto fbSizeF32 = Vector2Cast<f32>(frameBuffer.size);
       auto aspectRatio = fbSizeF32.width / fbSizeF32.height;
@@ -398,7 +343,7 @@ int main()
       auto model = // Matrix4x4Translate({0, 1, 0}) *
         Matrix4x4RotationY(meshAngle) *
         // Matrix4x4RotationY(RadiansFromDegreesF32(180)) *
-        // Matrix4x4Shear(0.5f, 0, 0, 0, 0, 0) *
+        Matrix4x4Shear(0.5f, 0, 0, 0, 0, 0) *
         Matrix4x4Scale({1, 1, 1});
 
       DrawMesh(&frameBuffer, viewProjection * model, modelMesh);

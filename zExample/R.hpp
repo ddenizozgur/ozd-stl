@@ -257,6 +257,64 @@ inline void R_FillRectAntialiased(R_FrameBuffer *frameBuffer, Rect<f32> rect, R_
   }
 }
 
+inline void R_RasterImage(R_FrameBuffer *frameBuffer, const Image *image,
+                          Rect<i32> srcRect, Rect<i32> dstRect)
+{
+  assert(image->format == Image_Format_BGRA8 && "Image must be decoded as Image_Format_BGRA8");
+
+  auto imageSize = Vector2Cast<i32>(image->size);
+  if (srcRect.width <= 0 || srcRect.height <= 0)
+  {
+    srcRect.position = {};
+    srcRect.size = imageSize;
+  }
+
+  auto bottomRight = dstRect.position + dstRect.size;
+  i32 left = Maximum(0, dstRect.x);
+  i32 right = Minimum(bottomRight.x, frameBuffer->size.width);
+  i32 top = Maximum(0, dstRect.y);
+  i32 bottom = Minimum(bottomRight.y, frameBuffer->size.height);
+  if (left >= right)
+  {
+    return;
+  }
+
+  usize fbWidth = frameBuffer->size.width;
+  i32 imagePitch = imageSize.width;
+
+  auto srcPixels = reinterpret_cast<const R_B8G8R8A8 *>(image->pixels.ptr);
+  srcPixels += srcRect.y * imagePitch + srcRect.x;
+
+  f32 dstStartX = static_cast<f32>(dstRect.x);
+  f32 dstEndX = static_cast<f32>(bottomRight.x);
+  f32 dstStartY = static_cast<f32>(dstRect.y);
+  f32 dstEndY = static_cast<f32>(bottomRight.y);
+  auto dstPixels = frameBuffer->colorData.ptr;
+
+  auto scratch = ScratchBegin();
+  Defer(ScratchEnd(scratch););
+
+  auto srcColumns = ArenaPushSlice<i32>(scratch.arena, right - left);
+  for (i32 x = left; x < right; x += 1)
+  {
+    f32 u = InverseLerpF32(dstStartX, dstEndX, x + 0.5f);
+    srcColumns[x - left] = FloorF32(u * srcRect.width);
+  }
+
+  for (i32 y = top; y < bottom; y += 1)
+  {
+    auto row = dstPixels + y * fbWidth + left;
+    f32 v = InverseLerpF32(dstStartY, dstEndY, y + 0.5f);
+    i32 srcY = FloorF32(v * srcRect.height);
+    auto srcRow = srcPixels + srcY * imagePitch;
+
+    for (usize i = 0; i < srcColumns.count; i += 1)
+    {
+      row[i] = srcRow[srcColumns[i]];
+    }
+  }
+}
+
 inline void R_PutGlyph_(R_FrameBuffer *frameBuffer, const u8 *rows, Vector2<i32> glyphSize,
                         Vector2<i32> position, R_B8G8R8A8 color)
 {
