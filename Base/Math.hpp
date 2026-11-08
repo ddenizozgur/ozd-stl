@@ -177,7 +177,6 @@ union Rect
   };
 };
 
-// the right and bottom edges are outside
 template <typename T>
 [[nodiscard]] constexpr bool RectContains(Rect<T> rect, Non_Deduced<Vector2<T>> point)
 {

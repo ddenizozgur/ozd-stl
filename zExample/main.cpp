@@ -7,9 +7,6 @@
 #include "../Win32Stuff/WindowRelated.hpp"
 #include "R3D.hpp"
 
-#define CGLTF_IMPLEMENTATION
-#include "../Vendor/cgltf.h"
-
 struct Example_Globals
 {
   Win32_Window_State windowState;
@@ -49,33 +46,38 @@ void UpdateTitle(HWND hWnd, f32 frameTime)
 struct Mesh
 {
   Slice<Vector3<f32>> positions;
+  Slice<Vector2<f32>> texcoords;
   Slice<u32> indices;
+  Pair<Image, bool> albedo;
 };
 
-inline Mesh LoadMesh(Arena_Allocator *arena, const char *path)
+inline Mesh LoadMesh(Arena_Allocator *arena, String path)
 {
+  auto scratch = ScratchBegin();
+  Defer(ScratchEnd(scratch, IsScratch(arena)););
+
+  auto pathCStr = CStringFrom(scratch.arena, path);
+
   cgltf_options options = {};
   cgltf_data *data = nullptr;
-  if (cgltf_parse_file(&options, path, &data) != cgltf_result_success)
+  if (cgltf_parse_file(&options, pathCStr, &data) != cgltf_result_success)
   {
     return {};
   }
   Defer(cgltf_free(data););
 
-  if (cgltf_load_buffers(&options, data, path) != cgltf_result_success ||
+  if (cgltf_load_buffers(&options, data, pathCStr) != cgltf_result_success ||
       cgltf_validate(data) != cgltf_result_success)
   {
     return {};
   }
 
   auto primitive = &data->meshes[0].primitives[0];
-  auto accessor = cgltf_find_accessor(primitive, cgltf_attribute_type_position, 0);
-
   Mesh mesh = {};
-  mesh.positions = ArenaPushSlice<Vector3<f32>>(arena, accessor->count);
-  cgltf_accessor_unpack_floats(accessor, mesh.positions.ptr->data, mesh.positions.count * 3);
-  mesh.indices = ArenaPushSlice<u32>(arena, primitive->indices->count);
-  cgltf_accessor_unpack_indices(primitive->indices, mesh.indices.ptr, sizeof(u32), mesh.indices.count);
+  mesh.positions = GLTF_LoadPositions(arena, primitive);
+  mesh.texcoords = GLTF_LoadTexcoords(arena, primitive, 0);
+  mesh.indices = GLTF_LoadIndices(arena, primitive);
+  mesh.albedo = GLTF_LoadAlbedo(arena, primitive, path);
   return mesh;
 }
 
@@ -226,7 +228,16 @@ inline void DrawWorldAxes(R_FrameBuffer *frameBuffer, const Matrix4x4 &viewProje
   }
 }
 
-inline void DrawMesh(R_FrameBuffer *frameBuffer, const Matrix4x4 &mvp, Mesh mesh)
+using Mesh_Draw_Kind = u32;
+enum : Mesh_Draw_Kind
+{
+  Mesh_Draw_Kind_Normal,
+  Mesh_Draw_Kind_PS1,
+  Mesh_Draw_Kind_Debug,
+};
+
+inline void DrawMesh(R_FrameBuffer *frameBuffer, const Matrix4x4 &mvp,
+                     Mesh mesh, Mesh_Draw_Kind drawKind = Mesh_Draw_Kind_PS1)
 {
   auto scratch = ScratchBegin();
   Defer(ScratchEnd(scratch););
@@ -239,13 +250,37 @@ inline void DrawMesh(R_FrameBuffer *frameBuffer, const Matrix4x4 &mvp, Mesh mesh
 
   for (usize i = 0; i < mesh.indices.count; i += 3)
   {
-    auto [a, aOk] = projected[mesh.indices[i + 0]];
-    auto [b, bOk] = projected[mesh.indices[i + 1]];
-    auto [c, cOk] = projected[mesh.indices[i + 2]];
+    u32 i0 = mesh.indices[i + 0];
+    u32 i1 = mesh.indices[i + 1];
+    u32 i2 = mesh.indices[i + 2];
+
+    auto [a, aOk] = projected[i0];
+    auto [b, bOk] = projected[i1];
+    auto [c, cOk] = projected[i2];
+
     if (aOk && bOk && cOk)
     {
-      auto color = R_PALETTE_VINIK24[(i / 3) % (ArrayCount(R_PALETTE_VINIK24) - 1)];
-      R3D_RasterTriangleFlatCCW(frameBuffer, {a, b, c}, color);
+      Vector3<f32> positions[3] = {a, b, c};
+      switch (drawKind)
+      {
+      case Mesh_Draw_Kind_Normal:
+        assert(false && "not implemented yet");
+      case Mesh_Draw_Kind_PS1:
+        if (mesh.albedo.second)
+        {
+          Vector2<f32> texcoords[3] = {mesh.texcoords[i0], mesh.texcoords[i1], mesh.texcoords[i2]};
+          R3D_RasterTriangleCCW_PS1Style(frameBuffer, &mesh.albedo.first, {positions, texcoords});
+          break;
+        }
+      case Mesh_Draw_Kind_Debug:
+      {
+        auto color = R_PALETTE_VINIK24[(i / 3) % (ArrayCount(R_PALETTE_VINIK24) - 1)];
+        R3D_RasterTriangleFlatCCW(frameBuffer, positions, color);
+        break;
+      }
+      default:
+        break;
+      }
     }
   }
 }
@@ -319,16 +354,11 @@ int main()
   Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic, true);
 
   auto arena = ArenaInit();
-  auto frameBuffer = R_CreateFrameBuffer(&arena, windowSize / 2);
+  auto frameBuffer = R_CreateFrameBuffer(&arena, windowSize);
 
-  auto modelPath = Win32_PathFromExe(&arena, StringLit("../Suzanne/suzanne.gltf"));
-  auto modelMesh = LoadMesh(&arena, modelPath.ptr);
-
-  /*
-  auto imgPath = Win32_PathFromExe(&arena, StringLit("../Suzanne/Suzanne_BaseColor.png"));
-  auto [fileBytes, fileOk] = Win32_ReadEntireFile(&arena, imgPath);
-  auto [img, imgOk] = Win32_WicDecodeImageAs(&arena, fileBytes, Image_Format_BGRA8);
-*/
+  // auto modelPath = Win32_PathFromExe(&arena, StringLit("../Chair/chair.gltf"));
+  auto modelPath = Win32_PathFromExe(&arena, StringLit("../Suzanne/Suzanne.gltf"));
+  auto modelMesh = LoadMesh(&arena, modelPath);
 
   ShowWindow(hWnd, SW_SHOWMAXIMIZED);
 
@@ -373,80 +403,8 @@ int main()
 
       DrawMesh(&frameBuffer, viewProjection * model, modelMesh);
       DrawWorldAxes(&frameBuffer, viewProjection, R_FONT_3DFX);
-
-      // auto imgSize = Vector2Cast<i32>(img.size);
-      // RasterImage(&frameBuffer, &img,
-      //             {.position = {}, .size = imgSize / 4},
-      //             {.position = {20, 20}, .size = imgSize / 4});
     }
 
     // DwmFlush();
   }
 }
-
-/*
-[[nodiscard]]
-inline Pair<Slice<u8>, bool>
-GltfImageBytes(Arena_Allocator *arena, const cgltf_image *image, String gltfPath)
-{
-  if (image->buffer_view != nullptr)
-  {
-    auto view = image->buffer_view;
-    auto bytes = const_cast<u8 *>(cgltf_buffer_view_data(view));
-    return {{bytes, view->size}, true};
-  }
-
-  auto scratch = ScratchBegin();
-  Defer(ScratchEnd(scratch, IsScratch(arena)););
-
-  char *relative = image->uri;
-  auto relativeCount = static_cast<i32>(cgltf_decode_uri(relative));
-  String folder = StringBeforeLastInclusive(gltfPath, StringLit("/\\"));
-  String path = StringFmt(scratch.arena, "%.*s%.*s", StringArgs(folder), relativeCount, relative);
-  return Win32_ReadEntireFile(arena, path);
-}
-
-[[nodiscard]]
-inline Pair<Image, bool>
-LoadAlbedo(Arena_Allocator *arena, const cgltf_primitive *primitive, String gltfPath)
-{
-  auto material = primitive->material;
-  if (material == nullptr)
-  {
-    return {};
-  }
-
-  auto texture = material->pbr_metallic_roughness.base_color_texture.texture;
-  if (texture == nullptr && material->has_pbr_specular_glossiness)
-  {
-    texture = material->pbr_specular_glossiness.diffuse_texture.texture;
-  }
-  if (texture == nullptr || texture->image == nullptr)
-  {
-    return {};
-  }
-
-  auto scratch = ScratchBegin();
-  Defer(ScratchEnd(scratch, IsScratch(arena)););
-
-  auto [bytes, bytesOk] = GltfImageBytes(scratch.arena, texture->image, gltfPath);
-  if (!bytesOk)
-  {
-    return {};
-  }
-  return Win32_WicDecodeImageAs(arena, bytes, Image_Format_BGRA8);
-}
-
-[[nodiscard]]
-inline Slice<Vector2<f32>> LoadTexcoords(Arena_Allocator *arena, const cgltf_primitive *primitive, i32 set)
-{
-  auto accessor = cgltf_find_accessor(primitive, cgltf_attribute_type_texcoord, set);
-  if (accessor == nullptr)
-  {
-    return {};
-  }
-  auto texcoords = ArenaPushSlice<Vector2<f32>>(arena, accessor->count);
-  cgltf_accessor_unpack_floats(accessor, texcoords.ptr->data, texcoords.count * 2);
-  return texcoords;
-}
-*/
