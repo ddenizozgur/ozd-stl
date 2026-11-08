@@ -64,8 +64,8 @@ constexpr usize AlignForwardPow2(usize val, usize alignment)
 [[nodiscard]]
 constexpr usize AlignForward(usize val, usize alignment)
 {
-  auto result = val + alignment - 1;
-  return result - result % alignment;
+  auto res = val + alignment - 1;
+  return res - res % alignment;
 }
 
 [[nodiscard]]

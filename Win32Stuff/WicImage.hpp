@@ -24,6 +24,10 @@ inline const GUID &Win32_WicPixelFormatFrom_(Image_Format format)
 {
   switch (format)
   {
+  case Image_Format_BGRA8:
+    return GUID_WICPixelFormat32bppBGRA;
+  case Image_Format_BGRA8Premultiplied:
+    return GUID_WICPixelFormat32bppPBGRA;
   case Image_Format_RGBA8Premultiplied:
     return GUID_WICPixelFormat32bppPRGBA;
   case Image_Format_Gray8:
@@ -59,9 +63,9 @@ inline const GUID &Win32_WicContainerFrom_(Image_File_Format format)
 inline IWICImagingFactory *Win32_CreateWicFactory_()
 {
   IWICImagingFactory *factory = nullptr;
-  auto result = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
-  assert(SUCCEEDED(result) && "COM isn't initialized on this thread, call Win32_InitComOnThread first");
-  (void)result;
+  auto hRes = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&factory));
+  assert(SUCCEEDED(hRes) && "COM isn't initialized on this thread, call Win32_InitComOnThread first");
+  (void)hRes;
   return factory;
 }
 

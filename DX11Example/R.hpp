@@ -107,14 +107,14 @@ inline void R_PushImage(DX11_GPU gpu, R_Batch *batch,
 
 inline void R_UploadAtlas(DX11_GPU gpu, Glyph_Atlas *atlas, DX11_Texture2D atlasTexture)
 {
-  auto [position, size] = GlyphAtlasTakeDirty(atlas);
-  if (size.width == 0)
+  auto dirty = GlyphAtlasTakeDirty(atlas);
+  if (dirty.width == 0)
   {
     return;
   }
-  usize start = static_cast<usize>(position.y) * atlas->size.width + position.x;
+  usize start = static_cast<usize>(dirty.y) * atlas->size.width + dirty.x;
   auto pixels = SliceFromRange(atlas->coverage, start, atlas->coverage.count);
-  DX11_UpdateTexture2D(gpu, atlasTexture, position, size, pixels, atlas->size.width);
+  DX11_UpdateTexture2D(gpu, atlasTexture, dirty, pixels, atlas->size.width);
 }
 
 // pen is on the baseline
@@ -143,8 +143,8 @@ inline Vector2<f32> R_PushText(DX11_GPU gpu, R_Batch *batch, Glyph_Atlas *atlas,
 
       R_Instance instance = {
         .position = {left, top},
-        .size = {static_cast<f32>(glyph.size.width), static_cast<f32>(glyph.size.height)},
-        .atlasPosition = {static_cast<f32>(glyph.position.x), static_cast<f32>(glyph.position.y)},
+        .size = Vector2Cast<f32>(glyph.size),
+        .atlasPosition = Vector2Cast<f32>(glyph.position),
         .color = color,
         .kind = R_Kind_Glyph,
       };

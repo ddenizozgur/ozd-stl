@@ -11,15 +11,19 @@
 #pragma comment(lib, "user32")
 #pragma comment(lib, "shcore")
 
+[[nodiscard]]
+constexpr Rect<i32> Win32_RectFromRECT(RECT rect)
+{
+  return {rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top};
+}
+
 struct Win32_Monitor
 {
   HMONITOR handle;
-  String name;           // GDI device name, \\.\DISPLAY1
-  Vector2<i32> position; // the primary monitor's top-left is 0,0
-  Vector2<i32> size;
-  Vector2<i32> workPosition; // without the taskbar
-  Vector2<i32> workSize;
-  u32 dpi; // USER_DEFAULT_SCREEN_DPI at 100% scaling
+  String name;        // GDI device name, \\.\DISPLAY1
+  Rect<i32> bounds;   // the primary monitor's top-left is 0,0
+  Rect<i32> workArea; // without the taskbar
+  u32 dpi;            // USER_DEFAULT_SCREEN_DPI at 100% scaling
   bool primary;
 };
 
@@ -55,15 +59,11 @@ inline Slice<Win32_Monitor> Win32_GetMonitors(Arena_Allocator *arena)
     UINT dpiY = 0;
     GetDpiForMonitor(handles[i], MDT_EFFECTIVE_DPI, &dpiX, &dpiY);
 
-    RECT full = info.rcMonitor;
-    RECT work = info.rcWork;
     monitors[i] = {
       .handle = handles[i],
       .name = Win32_StringFrom16(arena, {info.szDevice, wcslen(info.szDevice)}),
-      .position = {full.left, full.top},
-      .size = {full.right - full.left, full.bottom - full.top},
-      .workPosition = {work.left, work.top},
-      .workSize = {work.right - work.left, work.bottom - work.top},
+      .bounds = Win32_RectFromRECT(info.rcMonitor),
+      .workArea = Win32_RectFromRECT(info.rcWork),
       .dpi = dpiX,
       .primary = (info.dwFlags & MONITORINFOF_PRIMARY) != 0,
     };
@@ -119,14 +119,14 @@ inline Vector2<i32> Win32_WindowSizeForClient_(Vector2<i32> clientSize, u32 dpi,
   auto dpiI32 = static_cast<i32>(dpi);
   RECT rect = {0, 0, clientSize.width * dpiI32 / USER_DEFAULT_SCREEN_DPI, clientSize.height * dpiI32 / USER_DEFAULT_SCREEN_DPI};
   AdjustWindowRectExForDpi(&rect, style, false, exStyle, dpi);
-  return {rect.right - rect.left, rect.bottom - rect.top};
+  return Win32_RectFromRECT(rect).size;
 }
 
 [[nodiscard]]
-inline Vector2<i32> Win32_CenterInWorkArea_(Vector2<i32> workPosition, Vector2<i32> workSize, Vector2<i32> windowSize)
+inline Vector2<i32> Win32_CenterInWorkArea_(Rect<i32> workArea, Vector2<i32> windowSize)
 {
-  Vector2<i32> centered = workPosition + (workSize - windowSize) / 2;
-  return {Maximum(centered.x, workPosition.x), Maximum(centered.y, workPosition.y)};
+  Vector2<i32> centered = workArea.position + (workArea.size - windowSize) / 2;
+  return {Maximum(centered.x, workArea.x), Maximum(centered.y, workArea.y)};
 }
 
 // window starts hidden.
@@ -144,7 +144,7 @@ inline HWND Win32_CreateWindow(Win32_Window_Class_Id classId, String title, Vect
   if (monitor != nullptr)
   {
     auto windowSize = Win32_WindowSizeForClient_(clientSize, monitor->dpi, style, exStyle);
-    auto position = Win32_CenterInWorkArea_(monitor->workPosition, monitor->workSize, windowSize);
+    auto position = Win32_CenterInWorkArea_(monitor->workArea, windowSize);
     return CreateWindowExW(exStyle, className, title16.ptr, style,
                            position.x, position.y, windowSize.width, windowSize.height,
                            nullptr, nullptr, classId.hInstance, nullptr);
@@ -165,8 +165,7 @@ inline HWND Win32_CreateWindow(Win32_Window_Class_Id classId, String title, Vect
   {
     MONITORINFO info = {.cbSize = sizeof(info)};
     GetMonitorInfoW(MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST), &info); // NOTE: maybe MONITOR_DEFAULTTOPRIMARY
-    RECT work = info.rcWork;
-    position = Win32_CenterInWorkArea_({work.left, work.top}, {work.right - work.left, work.bottom - work.top}, windowSize);
+    position = Win32_CenterInWorkArea_(Win32_RectFromRECT(info.rcWork), windowSize);
   }
   else
   {
@@ -191,9 +190,9 @@ inline Win32_Windowed_Placement Win32_EnterFullscreen(HWND hWnd)
 
   MONITORINFO info = {.cbSize = sizeof(info)};
   GetMonitorInfoW(MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST), &info); // NOTE: maybe MONITOR_DEFAULTTOPRIMARY
-  RECT full = info.rcMonitor;
+  auto full = Win32_RectFromRECT(info.rcMonitor);
   SetWindowLongPtrW(hWnd, GWL_STYLE, windowed.style & ~WS_OVERLAPPEDWINDOW);
-  SetWindowPos(hWnd, HWND_TOP, full.left, full.top, full.right - full.left, full.bottom - full.top,
+  SetWindowPos(hWnd, HWND_TOP, full.x, full.y, full.width, full.height,
                SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
   return windowed;
 }
@@ -524,9 +523,8 @@ inline void Win32_WindowStateOnMessage(Win32_Window_State *windowState,
   case WM_DPICHANGED:
   {
     windowState->dpi = HIWORD(wParam);
-    auto suggested = reinterpret_cast<RECT *>(lParam);
-    SetWindowPos(hWnd, nullptr, suggested->left, suggested->top,
-                 suggested->right - suggested->left, suggested->bottom - suggested->top,
+    auto suggested = Win32_RectFromRECT(*reinterpret_cast<RECT *>(lParam));
+    SetWindowPos(hWnd, nullptr, suggested.x, suggested.y, suggested.width, suggested.height,
                  SWP_NOZORDER | SWP_NOACTIVATE);
     break;
   }

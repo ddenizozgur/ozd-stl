@@ -124,10 +124,10 @@ inline bool DX11_ResizeSwapchain(DX11_GPU gpu, DX11_Swapchain *swapchain, Vector
   Win32_ComSafeRelease(&swapchain->backbufferView);
   gpu.immediateContext1->Flush();
 
-  HRESULT result = swapchain->dxgiSwapchain2->ResizeBuffers(0, size.x, size.y, DXGI_FORMAT_UNKNOWN, desc.Flags);
+  HRESULT hRes = swapchain->dxgiSwapchain2->ResizeBuffers(0, size.x, size.y, DXGI_FORMAT_UNKNOWN, desc.Flags);
   // after a failed resize this points at the old buffers again
   swapchain->backbufferView = DX11_CreateBackbufferView_(gpu.device1, swapchain->dxgiSwapchain2, viewDesc.Format);
-  return SUCCEEDED(result) && swapchain->backbufferView != nullptr;
+  return SUCCEEDED(hRes) && swapchain->backbufferView != nullptr;
 }
 
 // blocks until the swapchain can take a new frame.

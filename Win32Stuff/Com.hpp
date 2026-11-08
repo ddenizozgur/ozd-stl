@@ -24,12 +24,12 @@ struct Win32_Com_Thread
 inline Win32_Com_Thread Win32_InitComOnThread(Com_Apartment apartment)
 {
   DWORD flags = apartment == Com_Apartment_SingleThreaded ? COINIT_APARTMENTTHREADED : COINIT_MULTITHREADED;
-  HRESULT result = CoInitializeEx(nullptr, flags | COINIT_DISABLE_OLE1DDE);
-  if (result == RPC_E_CHANGED_MODE)
+  HRESULT hRes = CoInitializeEx(nullptr, flags | COINIT_DISABLE_OLE1DDE);
+  if (hRes == RPC_E_CHANGED_MODE)
   {
     fprintf(stderr, "Win32_InitComOnThread: the thread is already in the other COM apartment, using that one\n");
   }
-  return {.needsUninitialize = SUCCEEDED(result)};
+  return {.needsUninitialize = SUCCEEDED(hRes)};
 }
 
 inline void Win32_UninitComOnThread(Win32_Com_Thread *com)

@@ -31,21 +31,21 @@ enum : Wait_Result
 };
 
 [[nodiscard]]
-inline Pair<u32, Wait_Result> Win32_WaitResultFrom_(DWORD result, u32 count)
+inline Pair<u32, Wait_Result> Win32_WaitResultFrom_(DWORD res, u32 count)
 {
-  if (result - WAIT_OBJECT_0 < count)
+  if (res - WAIT_OBJECT_0 < count)
   {
-    return {result - WAIT_OBJECT_0, Wait_Result_Signaled};
+    return {res - WAIT_OBJECT_0, Wait_Result_Signaled};
   }
-  if (result - WAIT_ABANDONED_0 < count)
+  if (res - WAIT_ABANDONED_0 < count)
   {
-    return {result - WAIT_ABANDONED_0, Wait_Result_Abandoned};
+    return {res - WAIT_ABANDONED_0, Wait_Result_Abandoned};
   }
-  if (result == WAIT_TIMEOUT)
+  if (res == WAIT_TIMEOUT)
   {
     return {0, Wait_Result_Timeout};
   }
-  if (result == WAIT_IO_COMPLETION)
+  if (res == WAIT_IO_COMPLETION)
   {
     return {0, Wait_Result_RanQueuedCallbacks};
   }
@@ -56,8 +56,8 @@ inline Pair<u32, Wait_Result> Win32_WaitResultFrom_(DWORD result, u32 count)
 inline Wait_Result Win32_Wait(Win32_Waitable waitable, u32 timeoutMs = INFINITE, Wait_Flags flags = Wait_Flag_None)
 {
   bool alertable = flags & Wait_Flag_RunQueuedCallbacks;
-  DWORD result = WaitForSingleObjectEx(waitable.handle, timeoutMs, alertable);
-  return Win32_WaitResultFrom_(result, 1).second;
+  DWORD res = WaitForSingleObjectEx(waitable.handle, timeoutMs, alertable);
+  return Win32_WaitResultFrom_(res, 1).second;
 }
 
 // returns index of the first one signaled
@@ -70,8 +70,8 @@ Win32_WaitAny(Slice<Win32_Waitable> waitables, u32 timeoutMs = INFINITE, Wait_Fl
   auto count = static_cast<DWORD>(waitables.count);
   auto handles = reinterpret_cast<const HANDLE *>(waitables.ptr);
   bool alertable = flags & Wait_Flag_RunQueuedCallbacks;
-  DWORD result = WaitForMultipleObjectsEx(count, handles, false, timeoutMs, alertable);
-  return Win32_WaitResultFrom_(result, count);
+  DWORD res = WaitForMultipleObjectsEx(count, handles, false, timeoutMs, alertable);
+  return Win32_WaitResultFrom_(res, count);
 }
 
 // Also wakes when the thread has window messages
@@ -88,12 +88,12 @@ Win32_WaitAnyOrWindowMessages(Slice<Win32_Waitable> waitables, u32 timeoutMs = I
   {
     waitFlags |= MWMO_ALERTABLE;
   }
-  DWORD result = MsgWaitForMultipleObjectsEx(count, handles, timeoutMs, QS_ALLINPUT, waitFlags);
-  if (result == WAIT_OBJECT_0 + count)
+  DWORD res = MsgWaitForMultipleObjectsEx(count, handles, timeoutMs, QS_ALLINPUT, waitFlags);
+  if (res == WAIT_OBJECT_0 + count)
   {
     return {0, Wait_Result_WindowMessages};
   }
-  return Win32_WaitResultFrom_(result, count);
+  return Win32_WaitResultFrom_(res, count);
 }
 
 inline void Win32_CloseWaitable(Win32_Waitable *waitable)

@@ -91,18 +91,17 @@ inline void GlyphAtlasReset(Glyph_Atlas *atlas)
 }
 
 [[nodiscard]]
-inline Pair<Vector2<u32>, Vector2<u32>> GlyphAtlasTakeDirty(Glyph_Atlas *atlas)
+inline Rect<u32> GlyphAtlasTakeDirty(Glyph_Atlas *atlas)
 {
-  Vector2<u32> position = atlas->dirtyMin;
-  Vector2<u32> size = {};
+  Rect<u32> dirty = {.position = atlas->dirtyMin, .size = {}};
   if (atlas->dirtyMin.x < atlas->dirtyMax.x &&
       atlas->dirtyMin.y < atlas->dirtyMax.y)
   {
-    size = atlas->dirtyMax - atlas->dirtyMin;
+    dirty.size = atlas->dirtyMax - atlas->dirtyMin;
   }
   atlas->dirtyMin = atlas->size;
   atlas->dirtyMax = {0, 0};
-  return {position, size};
+  return dirty;
 }
 
 // false when the glyph is bigger than the whole atlas.

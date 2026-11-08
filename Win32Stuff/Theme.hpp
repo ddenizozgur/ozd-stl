@@ -47,8 +47,8 @@ inline constexpr DWM_WINDOW_CORNER_PREFERENCE WIN32_CORNER_PREFERENCES[Window_Co
 inline bool Win32_SetWindowCorners(HWND hWnd, Window_Corners corners)
 {
   DWM_WINDOW_CORNER_PREFERENCE preference = WIN32_CORNER_PREFERENCES[corners];
-  auto hResult = DwmSetWindowAttribute(hWnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference, sizeof(preference));
-  return SUCCEEDED(hResult);
+  auto hRes = DwmSetWindowAttribute(hWnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference, sizeof(preference));
+  return SUCCEEDED(hRes);
 }
 
 // Backdrops require Windows 11 22H2.
@@ -56,18 +56,18 @@ inline bool Win32_SetWindowCorners(HWND hWnd, Window_Corners corners)
 inline bool Win32_SetDarkTheme(HWND hWnd, Window_Backdrop backdrop, bool backdropBehindClient = false)
 {
   BOOL darkTitleBar = true;
-  auto hResult = DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE,
-                                       &darkTitleBar, sizeof(darkTitleBar));
-  bool ok = SUCCEEDED(hResult);
+  auto hRes = DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE,
+                                    &darkTitleBar, sizeof(darkTitleBar));
+  bool ok = SUCCEEDED(hRes);
 
   i32 margin = backdrop != Window_Backdrop_None && backdropBehindClient ? -1 : 0;
   MARGINS margins = {margin, margin, margin, margin};
-  hResult = DwmExtendFrameIntoClientArea(hWnd, &margins);
-  ok &= SUCCEEDED(hResult);
+  hRes = DwmExtendFrameIntoClientArea(hWnd, &margins);
+  ok &= SUCCEEDED(hRes);
 
   DWM_SYSTEMBACKDROP_TYPE type = WIN32_BACKDROP_TYPES[backdrop];
-  hResult = DwmSetWindowAttribute(hWnd, DWMWA_SYSTEMBACKDROP_TYPE, &type, sizeof(type));
-  ok &= SUCCEEDED(hResult);
+  hRes = DwmSetWindowAttribute(hWnd, DWMWA_SYSTEMBACKDROP_TYPE, &type, sizeof(type));
+  ok &= SUCCEEDED(hRes);
 
   RedrawWindow(hWnd, nullptr, nullptr, RDW_FRAME | RDW_INVALIDATE);
   return ok;
@@ -76,17 +76,17 @@ inline bool Win32_SetDarkTheme(HWND hWnd, Window_Backdrop backdrop, bool backdro
 inline bool Win32_SetLightTheme(HWND hWnd)
 {
   BOOL darkTitleBar = false;
-  auto hResult = DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE,
-                                       &darkTitleBar, sizeof(darkTitleBar));
-  bool ok = SUCCEEDED(hResult);
+  auto hRes = DwmSetWindowAttribute(hWnd, DWMWA_USE_IMMERSIVE_DARK_MODE,
+                                    &darkTitleBar, sizeof(darkTitleBar));
+  bool ok = SUCCEEDED(hRes);
 
   MARGINS margins = {};
-  hResult = DwmExtendFrameIntoClientArea(hWnd, &margins);
-  ok &= SUCCEEDED(hResult);
+  hRes = DwmExtendFrameIntoClientArea(hWnd, &margins);
+  ok &= SUCCEEDED(hRes);
 
   DWM_SYSTEMBACKDROP_TYPE type = DWMSBT_NONE;
-  hResult = DwmSetWindowAttribute(hWnd, DWMWA_SYSTEMBACKDROP_TYPE, &type, sizeof(type));
-  ok &= SUCCEEDED(hResult);
+  hRes = DwmSetWindowAttribute(hWnd, DWMWA_SYSTEMBACKDROP_TYPE, &type, sizeof(type));
+  ok &= SUCCEEDED(hRes);
 
   RedrawWindow(hWnd, nullptr, nullptr, RDW_FRAME | RDW_INVALIDATE);
   return ok;

@@ -31,9 +31,9 @@ DX11_CompileShaderFromFile(Arena_Allocator *arena, String path,
 
   String16 path16 = Win32_String16From(scratch.arena, path);
   ID3DBlob *bytecode = nullptr, *messages = nullptr;
-  HRESULT result = D3DCompileFromFile(path16.ptr, terminated.ptr,
-                                      D3D_COMPILE_STANDARD_FILE_INCLUDE,
-                                      entry, target, flags, 0, &bytecode, &messages);
+  HRESULT hRes = D3DCompileFromFile(path16.ptr, terminated.ptr,
+                                    D3D_COMPILE_STANDARD_FILE_INCLUDE,
+                                    entry, target, flags, 0, &bytecode, &messages);
   if (messages != nullptr)
   {
     fprintf(stderr, "%.*s",
@@ -41,7 +41,7 @@ DX11_CompileShaderFromFile(Arena_Allocator *arena, String path,
             static_cast<const char *>(messages->GetBufferPointer()));
     messages->Release();
   }
-  if (FAILED(result))
+  if (FAILED(hRes))
   {
     fprintf(stderr, "compiling %.*s failed\n", StringArgs(path));
     Win32_ComSafeRelease(&bytecode);

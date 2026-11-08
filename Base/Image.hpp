@@ -9,6 +9,8 @@ enum : Image_Format
 {
   Image_Format_RGBA8,
   Image_Format_RGBA8Premultiplied,
+  Image_Format_BGRA8,
+  Image_Format_BGRA8Premultiplied,
   Image_Format_Gray8,
   Image_Format_RGBA16,
   Image_Format_Gray16,

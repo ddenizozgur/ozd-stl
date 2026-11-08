@@ -64,8 +64,8 @@ DX11_CreateTexture2D(DX11_GPU gpu, Slice<u8> pixels, Vector2<u32> size, DXGI_FOR
   }
   Defer(texture->Release(););
 
-  DX11_Texture2D result = {};
-  if (FAILED(gpu.device1->CreateShaderResourceView(texture, nullptr, &result.view)))
+  DX11_Texture2D res = {};
+  if (FAILED(gpu.device1->CreateShaderResourceView(texture, nullptr, &res.view)))
   {
     return {};
   }
@@ -73,9 +73,9 @@ DX11_CreateTexture2D(DX11_GPU gpu, Slice<u8> pixels, Vector2<u32> size, DXGI_FOR
   if (generateMips)
   {
     gpu.immediateContext1->UpdateSubresource(texture, 0, nullptr, pixels.ptr, rowPitch, 0);
-    gpu.immediateContext1->GenerateMips(result.view);
+    gpu.immediateContext1->GenerateMips(res.view);
   }
-  return {result, true};
+  return {res, true};
 }
 
 [[nodiscard]]
@@ -112,19 +112,18 @@ inline DXGI_FORMAT DX11_TextureFormatFromImage(Image_Format format, bool srgb)
 
 // the texture must be created updatable.
 inline void DX11_UpdateTexture2D(DX11_GPU gpu, DX11_Texture2D texture,
-                                 Vector2<u32> position, Vector2<u32> size,
-                                 Slice<u8> pixels, u32 rowPitch)
+                                 Rect<u32> region, Slice<u8> pixels, u32 rowPitch)
 {
   ID3D11Resource *resource = nullptr;
   texture.view->GetResource(&resource);
   Defer(resource->Release(););
 
   D3D11_BOX box = {
-    .left = position.x,
-    .top = position.y,
+    .left = region.x,
+    .top = region.y,
     .front = 0,
-    .right = position.x + size.width,
-    .bottom = position.y + size.height,
+    .right = region.x + region.width,
+    .bottom = region.y + region.height,
     .back = 1,
   };
   gpu.immediateContext1->UpdateSubresource(resource, 0, &box, pixels.ptr, rowPitch, 0);

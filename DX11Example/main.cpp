@@ -159,14 +159,13 @@ int main()
 
     DX11_WaitForBetterLatency(swapchain); // call it before handling input
     Win32_PollMessages(&g.inputState);
-    Vector2<u32> swapchainSize = {static_cast<u32>(g.windowState.clientSize.width),
-                                  static_cast<u32>(g.windowState.clientSize.height)};
+    auto swapchainSize = Vector2Cast<u32>(g.windowState.clientSize);
     DX11_ResizeSwapchain(gpu, &swapchain, swapchainSize);
 
     {
       R_Constants constantsFrame = {
         .gammaRatios = blendParams.gammaRatios,
-        .screenSize = {static_cast<f32>(swapchainSize.width), static_cast<f32>(swapchainSize.height)},
+        .screenSize = Vector2Cast<f32>(swapchainSize),
         .enhancedContrast = blendParams.enhancedContrast,
       };
       DX11_UpdateConstantBuffer(gpu, constantsGpu, SliceAsBytes(SliceMake(&constantsFrame, 1)));

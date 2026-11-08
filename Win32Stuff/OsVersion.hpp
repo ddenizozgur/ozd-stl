@@ -57,7 +57,7 @@ inline BOOL CALLBACK Win32_OsVersionInit(PINIT_ONCE, PVOID, PVOID *)
     auto scratch = ScratchBegin();
     Defer(ScratchEnd(scratch););
 
-    String converted = Win32_StringFrom16(scratch.arena, {release, wcsnlen(release, ARRAYSIZE(release))});
+    String converted = Win32_StringFrom16(scratch.arena, {release, wcsnlen(release, ArrayCount(release))});
     usize count = Minimum(converted.count, sizeof(win32OsVersion.release));
     memcpy(win32OsVersion.release, converted.ptr, count);
     version->release = {win32OsVersion.release, count};

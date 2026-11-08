@@ -15,10 +15,6 @@ union R_B8G8R8A8
   {
     u8 b, g, r, a;
   };
-
-  // these only exist for -Wmissing-braces
-  R_B8G8R8A8() = default;
-  constexpr R_B8G8R8A8(u8 b, u8 g, u8 r, u8 a) : data{b, g, r, a} {}
 };
 
 inline constexpr R_B8G8R8A8 R_CGA_BLACK = {0x00, 0x00, 0x00, 0xFF};
@@ -109,20 +105,14 @@ inline R_FrameBuffer R_CreateFrameBuffer(Arena_Allocator *arena, Vector2<i32> si
   return {colorData, depthData, size};
 }
 
-struct R_Viewport
-{
-  Vector2<i32> position;
-  Vector2<i32> size;
-};
-
 [[nodiscard]]
-inline R_Viewport R_PresentViewport(Vector2<i32> clientSize, Vector2<i32> frameBufferSize)
+inline Rect<i32> R_PresentViewport(Vector2<i32> clientSize, Vector2<i32> fbSize)
 {
-  i32 scale = Minimum(clientSize.width / frameBufferSize.width,
-                      clientSize.height / frameBufferSize.height);
+  i32 scale = Minimum(clientSize.width / fbSize.width,
+                      clientSize.height / fbSize.height);
   scale = Maximum(scale, 1);
-  auto size = frameBufferSize * scale;
-  return {(clientSize - size) / 2, size};
+  auto size = fbSize * scale;
+  return {.position = (clientSize - size) / 2, .size = size};
 }
 
 inline void R_PresentFrameBuffer(HWND hWnd, HDC hDC, R_FrameBuffer frameBuffer)
@@ -133,10 +123,10 @@ inline void R_PresentFrameBuffer(HWND hWnd, HDC hDC, R_FrameBuffer frameBuffer)
   i32 clientH = client.bottom - client.top;
 
   auto viewport = R_PresentViewport({clientW, clientH}, frameBuffer.size);
-  i32 dstW = viewport.size.width;
-  i32 dstH = viewport.size.height;
-  i32 dstX = viewport.position.x;
-  i32 dstY = viewport.position.y;
+  i32 dstW = viewport.width;
+  i32 dstH = viewport.height;
+  i32 dstX = viewport.x;
+  i32 dstY = viewport.y;
 
   // black bars around the image
   PatBlt(hDC, 0, 0, clientW, dstY, BLACKNESS);
@@ -167,21 +157,6 @@ inline Vector2<i32> R_PointFrom2F32(Vector2<f32> point)
 }
 
 [[nodiscard]]
-constexpr Vector2<f32> R_PointFrom2I32(Vector2<i32> point)
-{
-  return {static_cast<f32>(point.x), static_cast<f32>(point.y)};
-}
-
-[[nodiscard]]
-inline bool R_PointInRect(Vector2<i32> rectPosition, Vector2<i32> rectSize, Vector2<i32> position)
-{
-  auto rectbottomRight = rectPosition + rectSize;
-  bool insideX = position.x >= rectPosition.x && position.x < rectbottomRight.x;
-  bool insideY = position.y >= rectPosition.y && position.y < rectbottomRight.y;
-  return insideX && insideY;
-}
-
-[[nodiscard]]
 inline R_B8G8R8A8 *R_PixelPtrUnsafe(R_FrameBuffer *frameBuffer, Vector2<i32> position)
 {
   auto index = static_cast<usize>(position.y) * frameBuffer->size.width + position.x;
@@ -200,7 +175,7 @@ inline void R_BlendPixelUnsafe(R_FrameBuffer *frameBuffer, Vector2<i32> position
 
 inline void R_Plot(R_FrameBuffer *frameBuffer, Vector2<i32> position, R_B8G8R8A8 color)
 {
-  if (R_PointInRect({}, frameBuffer->size, position))
+  if (RectContains(Rect<i32>{.position = {}, .size = frameBuffer->size}, position))
   {
     auto &pixel = *R_PixelPtrUnsafe(frameBuffer, position);
     pixel = color;
@@ -211,7 +186,7 @@ inline void R_Plot(R_FrameBuffer *frameBuffer, Vector2<i32> position, R_B8G8R8A8
 inline R_B8G8R8A8 R_Peek(const R_FrameBuffer *frameBuffer, Vector2<i32> position)
 {
   R_B8G8R8A8 color = {};
-  if (R_PointInRect({}, frameBuffer->size, position))
+  if (RectContains(Rect<i32>{.position = {}, .size = frameBuffer->size}, position))
   {
     auto index = static_cast<usize>(position.y) * frameBuffer->size.width + position.x;
     color = frameBuffer->colorData.ptr[index];
@@ -235,15 +210,13 @@ inline void R_Clear(R_FrameBuffer *frameBuffer, R_B8G8R8A8 color, bool clearDept
   }
 }
 
-inline void R_FillRect(R_FrameBuffer *frameBuffer,
-                       Vector2<i32> position, Vector2<i32> size,
-                       R_B8G8R8A8 color)
+inline void R_FillRect(R_FrameBuffer *frameBuffer, Rect<i32> rect, R_B8G8R8A8 color)
 {
-  auto bottomRight = position + size;
+  auto bottomRight = rect.position + rect.size;
 
-  auto left = Maximum(0, position.x);
+  auto left = Maximum(0, rect.x);
   auto right = Minimum(bottomRight.x, frameBuffer->size.width);
-  auto top = Maximum(0, position.y);
+  auto top = Maximum(0, rect.y);
   auto bottom = Minimum(bottomRight.y, frameBuffer->size.height);
 
   for (auto y = top; y < bottom; y += 1)
@@ -256,20 +229,20 @@ inline void R_FillRect(R_FrameBuffer *frameBuffer,
   }
 }
 
-void R_FillRectAntialiased(R_FrameBuffer *frameBuffer, Vector2<f32> position, Vector2<f32> size, R_B8G8R8A8 color)
+inline void R_FillRectAntialiased(R_FrameBuffer *frameBuffer, Rect<f32> rect, R_B8G8R8A8 color)
 {
-  auto bottomRight = position + size;
-  i32 left = Maximum(0, static_cast<i32>(FloorF32(position.x)));
-  i32 top = Maximum(0, static_cast<i32>(FloorF32(position.y)));
+  auto bottomRight = rect.position + rect.size;
+  i32 left = Maximum(0, static_cast<i32>(FloorF32(rect.x)));
+  i32 top = Maximum(0, static_cast<i32>(FloorF32(rect.y)));
   i32 right = Minimum(static_cast<i32>(CeilF32(bottomRight.x)), frameBuffer->size.width);
   i32 bottom = Minimum(static_cast<i32>(CeilF32(bottomRight.y)), frameBuffer->size.height);
 
   for (auto y = top; y < bottom; y += 1)
   {
-    f32 coverageY = Minimum(y + 1.0f, bottomRight.y) - Maximum(static_cast<f32>(y), position.y);
+    f32 coverageY = Minimum(y + 1.0f, bottomRight.y) - Maximum(static_cast<f32>(y), rect.y);
     for (auto x = left; x < right; x += 1)
     {
-      f32 coverageX = Minimum(x + 1.0f, bottomRight.x) - Maximum(static_cast<f32>(x), position.x);
+      f32 coverageX = Minimum(x + 1.0f, bottomRight.x) - Maximum(static_cast<f32>(x), rect.x);
       f32 coverage = coverageX * coverageY;
       if (coverage >= 1.0f)
       {
@@ -505,15 +478,18 @@ inline void R_HexDump(R_FrameBuffer *frameBuffer, R_BitmapFont font, Vector2<i32
 }
 
 [[nodiscard]]
-constexpr Vector2<f32> R_PositionToNDC(Vector2<f32> position, R_Viewport viewport)
+constexpr Vector2<f32> R_PositionToNDC(Vector2<f32> position, Rect<i32> viewport)
 {
-  return ((position - R_PointFrom2I32(viewport.position)) / R_PointFrom2I32(viewport.size)) * 2 - 1;
+  auto start = Vector2Cast<f32>(viewport.position);
+  auto end = start + Vector2Cast<f32>(viewport.size);
+  return InverseLerpF32(start, end, position) * 2 - 1;
 }
 
 [[nodiscard]]
-constexpr Vector2<f32> R_NDCToPosition(Vector2<f32> ndc, R_Viewport viewport)
+constexpr Vector2<f32> R_NDCToPosition(Vector2<f32> ndc, Rect<i32> viewport)
 {
-  return ((ndc + 1) / 2) * R_PointFrom2I32(viewport.size) + R_PointFrom2I32(viewport.position);
+  auto t = InverseLerpF32(Vector2<f32>{-1.0f, -1.0f}, Vector2<f32>{1.0f, 1.0f}, ndc);
+  return t * Vector2Cast<f32>(viewport.size) + Vector2Cast<f32>(viewport.position);
 }
 
 [[nodiscard]]
@@ -526,7 +502,7 @@ constexpr f32 R_EdgeFunctionCCW(Vector2<f32> a, Vector2<f32> b, Vector2<f32> poi
 
 inline void R_RasterLine(R_FrameBuffer *frameBuffer, Vector2<f32> a, Vector2<f32> b, R_B8G8R8A8 color)
 {
-  auto frameBufferSize2F32 = R_PointFrom2I32(frameBuffer->size);
+  auto fbSizeF32 = Vector2Cast<f32>(frameBuffer->size);
 
   auto delta = b - a;
   if (fabsf(delta.x) >= fabsf(delta.y))
@@ -535,8 +511,8 @@ inline void R_RasterLine(R_FrameBuffer *frameBuffer, Vector2<f32> a, Vector2<f32
     auto end = a.x < b.x ? b : a;
     f32 slope = (end.y - start.y) / (end.x - start.x);
 
-    i32 first = RoundHalfDownF32(Clamp(start.x, 0.0f, frameBufferSize2F32.x));
-    i32 last = RoundHalfDownF32(Clamp(end.x, 0.0f, frameBufferSize2F32.x));
+    i32 first = RoundHalfDownF32(Clamp(start.x, 0.0f, fbSizeF32.x));
+    i32 last = RoundHalfDownF32(Clamp(end.x, 0.0f, fbSizeF32.x));
     for (i32 x = first; x < last; x += 1)
     {
       i32 y = FloorF32(start.y + slope * (x + 0.5f - start.x));
@@ -549,8 +525,8 @@ inline void R_RasterLine(R_FrameBuffer *frameBuffer, Vector2<f32> a, Vector2<f32
     auto end = a.y < b.y ? b : a;
     f32 slope = (end.x - start.x) / (end.y - start.y);
 
-    i32 first = RoundHalfDownF32(Clamp(start.y, 0.0f, frameBufferSize2F32.y));
-    i32 last = RoundHalfDownF32(Clamp(end.y, 0.0f, frameBufferSize2F32.y));
+    i32 first = RoundHalfDownF32(Clamp(start.y, 0.0f, fbSizeF32.y));
+    i32 last = RoundHalfDownF32(Clamp(end.y, 0.0f, fbSizeF32.y));
     for (i32 y = first; y < last; y += 1)
     {
       i32 x = FloorF32(start.x + slope * (y + 0.5f - start.y));
@@ -578,27 +554,27 @@ inline void R_RasterTriangleFlatCCW(R_FrameBuffer *frameBuffer,
   auto topMost = Minimum3(p0.y, p1.y, p2.y);
   auto bottomMost = Maximum3(p0.y, p1.y, p2.y);
 
-  auto frameBufferSize2F32 = R_PointFrom2I32(frameBuffer->size);
-  i32 left = RoundHalfDownF32(Clamp(leftMost, 0.0f, frameBufferSize2F32.x));
-  i32 right = RoundHalfDownF32(Clamp(rightMost, 0.0f, frameBufferSize2F32.x));
-  i32 top = RoundHalfDownF32(Clamp(topMost, 0.0f, frameBufferSize2F32.y));
-  i32 bottom = RoundHalfDownF32(Clamp(bottomMost, 0.0f, frameBufferSize2F32.y));
+  auto fbSizeF32 = Vector2Cast<f32>(frameBuffer->size);
+  i32 left = RoundHalfDownF32(Clamp(leftMost, 0.0f, fbSizeF32.x));
+  i32 right = RoundHalfDownF32(Clamp(rightMost, 0.0f, fbSizeF32.x));
+  i32 top = RoundHalfDownF32(Clamp(topMost, 0.0f, fbSizeF32.y));
+  i32 bottom = RoundHalfDownF32(Clamp(bottomMost, 0.0f, fbSizeF32.y));
 
-  auto pixelBasePtr = frameBuffer->colorData.ptr;
-  usize width = frameBuffer->size.width;
+  auto pixels = frameBuffer->colorData.ptr;
+  usize fbWidth = frameBuffer->size.width;
 
   for (i32 y = top; y < bottom; y += 1)
   {
-    auto pixelRow = pixelBasePtr + y * width;
+    auto row = pixels + y * fbWidth;
     for (i32 x = left; x < right; x += 1)
     {
-      auto center = R_PointFrom2I32({x, y}) + Vector2<f32>{0.5, 0.5};
+      auto center = Vector2Cast<f32>(Vector2<i32>{x, y}) + Vector2<f32>{0.5, 0.5};
       bool isInside = R_EdgeFunctionCCW(p1, p2, center) >= 0 &&
                       R_EdgeFunctionCCW(p2, p0, center) >= 0 &&
                       R_EdgeFunctionCCW(p0, p1, center) >= 0;
       if (isInside)
       {
-        pixelRow[x] = color;
+        row[x] = color;
       }
     }
   }
@@ -627,32 +603,32 @@ inline void R_RasterTriangleGouraudCCW(R_FrameBuffer *frameBuffer,
   auto topMost = Minimum3(p0.y, p1.y, p2.y);
   auto bottomMost = Maximum3(p0.y, p1.y, p2.y);
 
-  auto frameBufferSize2F32 = R_PointFrom2I32(frameBuffer->size);
-  i32 left = RoundHalfDownF32(Clamp(leftMost, 0.0f, frameBufferSize2F32.x));
-  i32 right = RoundHalfDownF32(Clamp(rightMost, 0.0f, frameBufferSize2F32.x));
-  i32 top = RoundHalfDownF32(Clamp(topMost, 0.0f, frameBufferSize2F32.y));
-  i32 bottom = RoundHalfDownF32(Clamp(bottomMost, 0.0f, frameBufferSize2F32.y));
+  auto fbSizeF32 = Vector2Cast<f32>(frameBuffer->size);
+  i32 left = RoundHalfDownF32(Clamp(leftMost, 0.0f, fbSizeF32.x));
+  i32 right = RoundHalfDownF32(Clamp(rightMost, 0.0f, fbSizeF32.x));
+  i32 top = RoundHalfDownF32(Clamp(topMost, 0.0f, fbSizeF32.y));
+  i32 bottom = RoundHalfDownF32(Clamp(bottomMost, 0.0f, fbSizeF32.y));
 
-  auto pixelBasePtr = frameBuffer->colorData.ptr;
-  usize width = frameBuffer->size.width;
+  auto pixels = frameBuffer->colorData.ptr;
+  usize fbWidth = frameBuffer->size.width;
   auto oneOverAreaTimes2 = 1 / areaTimes2; // dont needed when -ffast-math
 
   for (i32 y = top; y < bottom; y += 1)
   {
-    auto pixelRow = pixelBasePtr + y * width;
+    auto row = pixels + y * fbWidth;
     for (i32 x = left; x < right; x += 1)
     {
-      auto center = R_PointFrom2I32({x, y}) + Vector2<f32>{0.5, 0.5};
+      auto center = Vector2Cast<f32>(Vector2<i32>{x, y}) + Vector2<f32>{0.5, 0.5};
       auto w0 = R_EdgeFunctionCCW(p1, p2, center) * oneOverAreaTimes2;
       auto w1 = R_EdgeFunctionCCW(p2, p0, center) * oneOverAreaTimes2;
       auto w2 = R_EdgeFunctionCCW(p0, p1, center) * oneOverAreaTimes2;
 
       if (bool isInside = w0 >= 0 && w1 >= 0 && w2 >= 0; isInside)
       {
-        pixelRow[x].data[0] = RoundHalfUpF32(w0 * c0.data[0] + w1 * c1.data[0] + w2 * c2.data[0]);
-        pixelRow[x].data[1] = RoundHalfUpF32(w0 * c0.data[1] + w1 * c1.data[1] + w2 * c2.data[1]);
-        pixelRow[x].data[2] = RoundHalfUpF32(w0 * c0.data[2] + w1 * c1.data[2] + w2 * c2.data[2]);
-        pixelRow[x].data[3] = RoundHalfUpF32(w0 * c0.data[3] + w1 * c1.data[3] + w2 * c2.data[3]);
+        row[x].data[0] = RoundHalfUpF32(w0 * c0.data[0] + w1 * c1.data[0] + w2 * c2.data[0]);
+        row[x].data[1] = RoundHalfUpF32(w0 * c0.data[1] + w1 * c1.data[1] + w2 * c2.data[1]);
+        row[x].data[2] = RoundHalfUpF32(w0 * c0.data[2] + w1 * c1.data[2] + w2 * c2.data[2]);
+        row[x].data[3] = RoundHalfUpF32(w0 * c0.data[3] + w1 * c1.data[3] + w2 * c2.data[3]);
       }
     }
   }

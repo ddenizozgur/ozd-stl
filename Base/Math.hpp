@@ -17,6 +17,12 @@ LerpF32(f32 start, f32 end, f32 t)
   return (1 - t) * start + t * end;
 }
 
+[[nodiscard]] constexpr f32
+InverseLerpF32(f32 start, f32 end, f32 value)
+{
+  return (value - start) / (end - start);
+}
+
 inline constexpr f32 PI_F32 = 3.14159265358979323846f;
 [[nodiscard]] constexpr f32 RadiansFromDegreesF32(f32 degrees) { return degrees * (PI_F32 / 180); }
 [[nodiscard]] constexpr f32 DegreesFromRadiansF32(f32 radians) { return radians * (180 / PI_F32); }
@@ -137,6 +143,48 @@ template <typename T>
 LerpF32(Vector2<f32> start, Vector2<f32> end, f32 t)
 {
   return start * (1 - t) + end * t;
+}
+
+[[nodiscard]] constexpr Vector2<f32>
+InverseLerpF32(Vector2<f32> start, Vector2<f32> end, Vector2<f32> value)
+{
+  return (value - start) / (end - start);
+}
+
+template <typename To, typename From>
+[[nodiscard]] constexpr Vector2<To> Vector2Cast(Vector2<From> vector)
+{
+  return {static_cast<To>(vector.data[0]),
+          static_cast<To>(vector.data[1])};
+}
+
+template <typename T>
+union Rect
+{
+  static_assert(Is_Number<T>::VALUE, "Rect needs a numeric type");
+
+  T data[4];
+
+  struct
+  {
+    T x, y, width, height;
+  };
+
+  struct
+  {
+    Vector2<T> position;
+    Vector2<T> size;
+  };
+};
+
+// the right and bottom edges are outside
+template <typename T>
+[[nodiscard]] constexpr bool RectContains(Rect<T> rect, Non_Deduced<Vector2<T>> point)
+{
+  auto bottomRight = rect.position + rect.size;
+  bool insideX = point.x >= rect.x && point.x < bottomRight.x;
+  bool insideY = point.y >= rect.y && point.y < bottomRight.y;
+  return insideX && insideY;
 }
 
 template <typename T>
@@ -287,6 +335,12 @@ template <typename T>
 LerpF32(Vector3<f32> start, Vector3<f32> end, f32 t)
 {
   return start * (1 - t) + end * t;
+}
+
+[[nodiscard]] constexpr Vector3<f32>
+InverseLerpF32(Vector3<f32> start, Vector3<f32> end, Vector3<f32> value)
+{
+  return (value - start) / (end - start);
 }
 
 template <typename T>

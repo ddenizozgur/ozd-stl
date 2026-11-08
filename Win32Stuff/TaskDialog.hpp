@@ -169,13 +169,13 @@ inline Dialog_Result Win32_TaskDialog(HWND owner, String title, String instructi
     auto instruction16 = Win32_String16From(scratch.arena, instruction);
     auto content16 = Win32_String16From(scratch.arena, content);
 
-    auto hResult = win32TaskDialog(owner, nullptr, title16.ptr,
-                                   instruction.count != 0 ? instruction16.ptr : nullptr,
-                                   content.count != 0 ? content16.ptr : nullptr,
-                                   WIN32_TASK_DIALOG_BUTTONS[buttons],
-                                   WIN32_TASK_DIALOG_ICONS[icon],
-                                   &pressedButton);
-    if (FAILED(hResult))
+    auto hRes = win32TaskDialog(owner, nullptr, title16.ptr,
+                                instruction.count != 0 ? instruction16.ptr : nullptr,
+                                content.count != 0 ? content16.ptr : nullptr,
+                                WIN32_TASK_DIALOG_BUTTONS[buttons],
+                                WIN32_TASK_DIALOG_ICONS[icon],
+                                &pressedButton);
+    if (FAILED(hRes))
     {
       pressedButton = 0;
     }

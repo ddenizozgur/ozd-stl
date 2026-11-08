@@ -298,10 +298,10 @@ Win32_DWriteShapeText16(Arena_Allocator *arena, Win32_DWrite dwrite, Win32_DWrit
   {
     glyphs = ArenaPushSlice<u16>(scratch.arena, maxGlyphCount);
     glyphProps = ArenaPushSlice<DWRITE_SHAPING_GLYPH_PROPERTIES>(scratch.arena, maxGlyphCount);
-    HRESULT result = dwrite.analyzer->GetGlyphs(text16.ptr, textLength, font.face2, false, false, &script, nullptr,
-                                                nullptr, &featureRanges, &textLength, featureRangeCount, maxGlyphCount,
-                                                clusters.ptr, textProps.ptr, glyphs.ptr, glyphProps.ptr, &glyphCount);
-    if (result != E_NOT_SUFFICIENT_BUFFER)
+    HRESULT hRes = dwrite.analyzer->GetGlyphs(text16.ptr, textLength, font.face2, false, false, &script, nullptr,
+                                              nullptr, &featureRanges, &textLength, featureRangeCount, maxGlyphCount,
+                                              clusters.ptr, textProps.ptr, glyphs.ptr, glyphProps.ptr, &glyphCount);
+    if (hRes != E_NOT_SUFFICIENT_BUFFER)
     {
       break;
     }

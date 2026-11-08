@@ -29,7 +29,7 @@ inline Random_State RandomInit(u64 seed)
 inline u64 RandomU64(Random_State *random)
 {
   u64 *s = random->s;
-  u64 result = RotateLeft64(s[1] * 5, 7) * 9;
+  u64 res = RotateLeft64(s[1] * 5, 7) * 9;
   u64 t = s[1] << 17;
   s[2] ^= s[0];
   s[3] ^= s[1];
@@ -37,7 +37,7 @@ inline u64 RandomU64(Random_State *random)
   s[0] ^= s[3];
   s[2] ^= t;
   s[3] = RotateLeft64(s[3], 45);
-  return result;
+  return res;
 }
 
 // [0, count)
