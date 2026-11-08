@@ -536,21 +536,6 @@ inline void R_HexDump(R_FrameBuffer *frameBuffer, R_BitmapFont font, Vector2<i32
 }
 
 [[nodiscard]]
-constexpr Vector2<f32> R_PositionToNDC(Vector2<f32> position, Rect<i32> viewport)
-{
-  auto start = Vector2Cast<f32>(viewport.position);
-  auto end = start + Vector2Cast<f32>(viewport.size);
-  return InverseLerpF32(start, end, position) * 2 - 1;
-}
-
-[[nodiscard]]
-constexpr Vector2<f32> R_NDCToPosition(Vector2<f32> ndc, Rect<i32> viewport)
-{
-  auto t = InverseLerpF32(Vector2<f32>{-1.0f, -1.0f}, Vector2<f32>{1.0f, 1.0f}, ndc);
-  return t * Vector2Cast<f32>(viewport.size) + Vector2Cast<f32>(viewport.position);
-}
-
-[[nodiscard]]
 constexpr f32 R_EdgeFunctionCCW(Vector2<f32> a, Vector2<f32> b, Vector2<f32> point)
 {
   auto edge = b - a;

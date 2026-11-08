@@ -186,6 +186,21 @@ template <typename T>
   return insideX && insideY;
 }
 
+[[nodiscard]]
+constexpr Vector2<f32> PositionToNDC(Vector2<f32> position, Rect<i32> viewport)
+{
+  auto start = Vector2Cast<f32>(viewport.position);
+  auto end = start + Vector2Cast<f32>(viewport.size);
+  return InverseLerpF32(start, end, position) * 2 - 1;
+}
+
+[[nodiscard]]
+constexpr Vector2<f32> NDCToPosition(Vector2<f32> ndc, Rect<i32> viewport)
+{
+  auto t = InverseLerpF32(Vector2<f32>{-1.0f, -1.0f}, Vector2<f32>{1.0f, 1.0f}, ndc);
+  return t * Vector2Cast<f32>(viewport.size) + Vector2Cast<f32>(viewport.position);
+}
+
 template <typename T>
 union Vector3
 {

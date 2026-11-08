@@ -2,6 +2,8 @@
 
 #include "../Base/File.hpp"
 #include "../Base/Time.hpp"
+#include "../Misc/Camera.hpp"
+#include "../Misc/GLTF.hpp"
 #include "../Win32Stuff/Theme.hpp"
 #include "../Win32Stuff/WicImage.hpp"
 #include "../Win32Stuff/WindowRelated.hpp"
@@ -73,12 +75,12 @@ inline Mesh LoadMesh(Arena_Allocator *arena, String path)
   }
 
   auto primitive = &data->meshes[0].primitives[0];
-  Mesh mesh = {};
-  mesh.positions = GLTF_LoadPositions(arena, primitive);
-  mesh.texcoords = GLTF_LoadTexcoords(arena, primitive, 0);
-  mesh.indices = GLTF_LoadIndices(arena, primitive);
-  mesh.albedo = GLTF_LoadAlbedo(arena, primitive, path);
-  return mesh;
+  return {
+    .positions = GLTF_LoadPositions(arena, primitive),
+    .texcoords = GLTF_LoadTexcoords(arena, primitive, 0),
+    .indices = GLTF_LoadIndices(arena, primitive),
+    .albedo = GLTF_LoadAlbedo(arena, primitive, path),
+  };
 }
 
 inline constexpr f32 WORLD_NEAR_Z = 0.1f;
@@ -93,7 +95,7 @@ inline Matrix4x4 WorldPerspectiveMatrix(f32 fovYRadians, f32 aspect)
   return Matrix4x4PerspectiveRH(fovYRadians, aspect, WORLD_NEAR_Z, WORLD_FAR_Z);
 }
 
-inline void CameraUpdate(R3D_Camera *camera, f32 frameTime)
+inline void Camera3DUpdate(Camera3D *camera, f32 frameTime)
 {
   auto input = &g.inputState;
 
@@ -108,8 +110,8 @@ inline void CameraUpdate(R3D_Camera *camera, f32 frameTime)
     camera->pitch = Clamp(camera->pitch, -CAMERA_PITCH_LIMIT, CAMERA_PITCH_LIMIT);
   }
 
-  auto forward = R3D_CameraForward(camera);
-  auto right = R3D_CameraRight(forward);
+  auto forward = Camera3DForward(camera);
+  auto right = Camera3DRight(forward);
   Vector3<f32> direction = {};
   if (Win32_KeyDown(input, 'W'))
   {
@@ -151,7 +153,7 @@ inline Pair<Vector4<f32>, bool> ProjectToScreen(const R_FrameBuffer *frameBuffer
     return {};
   }
   f32 oneOverW = 1 / clip.w;
-  Vector2<f32> screen = R_NDCToPosition(clip.xy * oneOverW, {.position = {}, .size = frameBuffer->size});
+  Vector2<f32> screen = NDCToPosition(clip.xy * oneOverW, {.position = {}, .size = frameBuffer->size});
   f32 depth = clip.z * oneOverW;
   return {{screen.x, screen.y, depth, oneOverW}, true};
 }
@@ -201,9 +203,10 @@ inline void DrawWorldLine(R_FrameBuffer *frameBuffer, const Matrix4x4 &viewProje
     clipB = clipOnNear;
   }
 
+  auto viewport = Rect<i32>{.position = {}, .size = frameBuffer->size};
   R_RasterLine(frameBuffer,
-               R_NDCToPosition(clipA.xy / clipA.w, {.position = {}, .size = frameBuffer->size}),
-               R_NDCToPosition(clipB.xy / clipB.w, {.position = {}, .size = frameBuffer->size}),
+               NDCToPosition(clipA.xy / clipA.w, viewport),
+               NDCToPosition(clipB.xy / clipB.w, viewport),
                color);
 }
 
@@ -312,7 +315,7 @@ int main()
   auto timeNow = Win32_NowNanoseconds();
   auto timeLast = timeNow;
 
-  R3D_Camera camera = {.position = {1, 1, 4}};
+  Camera3D camera = {.position = {1, 1, 4}};
   f32 meshAngle = 0;
 
   for (; !g.windowState.destroyed;)
@@ -324,7 +327,7 @@ int main()
 
     Win32_PollMessages(&g.inputState);
 
-    CameraUpdate(&camera, frameTime);
+    Camera3DUpdate(&camera, frameTime);
     meshAngle += frameTime;
 
     {
@@ -339,11 +342,11 @@ int main()
       auto fbSizeF32 = Vector2Cast<f32>(frameBuffer.size);
       auto aspectRatio = fbSizeF32.width / fbSizeF32.height;
       auto projection = WorldPerspectiveMatrix(RadiansFromDegreesF32(60), aspectRatio);
-      auto viewProjection = projection * R3D_CameraViewMatrix(&camera);
+      auto viewProjection = projection * Camera3DViewMatrix(&camera);
       auto model = // Matrix4x4Translate({0, 1, 0}) *
         Matrix4x4RotationY(meshAngle) *
         // Matrix4x4RotationY(RadiansFromDegreesF32(180)) *
-        Matrix4x4Shear(0.5f, 0, 0, 0, 0, 0) *
+        // Matrix4x4Shear(0.5f, 0, 0, 0, 0, 0) *
         Matrix4x4Scale({1, 1, 1});
 
       DrawMesh(&frameBuffer, viewProjection * model, modelMesh);
