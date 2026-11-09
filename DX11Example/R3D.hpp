@@ -1,5 +1,7 @@
 #pragma once
 
+// TODO: maybe reversed Z: projection near=1 far=0, clear depth to 0, D3D11_COMPARISON_GREATER
+
 #include "../Base/File.hpp"
 #include "../DX11Stuff/Buffers.hpp"
 #include "../DX11Stuff/Presets.hpp"

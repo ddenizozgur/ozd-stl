@@ -200,7 +200,8 @@ inline void DX11_FlushInfoQueue_(IDXGIInfoQueue *queue)
     SIZE_T size = 0;
     queue->GetMessage(DXGI_DEBUG_ALL, i, nullptr, &size);
 
-    auto message = ArenaPush<DXGI_INFO_QUEUE_MESSAGE>(scratch.arena, size / sizeof(DXGI_INFO_QUEUE_MESSAGE));
+    void *messageBytes = ArenaPushWithAlignment(scratch.arena, size, alignof(DXGI_INFO_QUEUE_MESSAGE));
+    auto message = static_cast<DXGI_INFO_QUEUE_MESSAGE *>(messageBytes);
     queue->GetMessage(DXGI_DEBUG_ALL, i, message, &size);
 
     auto producer = message->Producer == DXGI_DEBUG_D3D11 ? "D3D11" : "DXGI";

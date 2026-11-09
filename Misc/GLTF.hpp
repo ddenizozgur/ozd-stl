@@ -1,5 +1,6 @@
 #pragma once
 
+// TODO:
 #define CGLTF_IMPLEMENTATION
 #include "../Vendor/cgltf.h"
 

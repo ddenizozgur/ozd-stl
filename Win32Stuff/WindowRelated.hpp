@@ -280,7 +280,7 @@ struct Win32_Input_State
   u8 buttonsPressed;
   u8 buttonsReleased;
   bool mouseInsideClient;
-  Vector2<i32> mousePosition; // client pixels, top-left origin
+  Vector2<i32> mousePosition;
   Vector2<f32> wheelDelta;
   char textStorage[256];
   Fixed_List<char> textWithCtrlChars; // UTF-8, ctrl chars are \b \t \n.
@@ -396,13 +396,18 @@ inline void Win32_InputStateOnMessage(Win32_Input_State *inputState, HWND hWnd, 
   case WM_SYSKEYUP:
   {
     auto key = static_cast<u8>(wParam);
+    bool wasDown = KeyBitsGet(&inputState->keysDown, key);
     // Print Screen only sends key up
-    if (!KeyBitsGet(&inputState->keysDown, key))
+    if (key == VK_SNAPSHOT && !wasDown)
     {
       KeyBitsSet(&inputState->keysPressed, key, true);
+      wasDown = true;
     }
-    KeyBitsSet(&inputState->keysDown, key, false);
-    KeyBitsSet(&inputState->keysReleased, key, true);
+    if (wasDown)
+    {
+      KeyBitsSet(&inputState->keysDown, key, false);
+      KeyBitsSet(&inputState->keysReleased, key, true);
+    }
     break;
   }
   case WM_KILLFOCUS:
