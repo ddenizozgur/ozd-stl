@@ -103,6 +103,27 @@ inline void DX11_ReleaseDepthTarget(DX11_Depth_Target *target)
   Win32_ComSafeRelease(&target->view);
 }
 
+inline bool DX11_ResizeDepthTarget(DX11_GPU gpu, DX11_Depth_Target *target, Vector2<u32> size)
+{
+  auto oldSize = DX11_GetDepthTargetSize(*target);
+  if (size.width == oldSize.width && size.height == oldSize.height)
+  {
+    return true;
+  }
+
+  D3D11_DEPTH_STENCIL_VIEW_DESC desc = {};
+  target->view->GetDesc(&desc);
+
+  auto [resized, resizedOk] = DX11_CreateDepthTarget(gpu, size, desc.Format);
+  if (!resizedOk)
+  {
+    return false;
+  }
+  DX11_ReleaseDepthTarget(target);
+  *target = resized;
+  return true;
+}
+
 //
 // Binding
 //

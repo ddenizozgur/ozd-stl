@@ -118,6 +118,7 @@ inline void R_Bind(R_State *r, Vector2<f32> screenSize)
   context->PSSetConstantBuffers(0, 1, &r->constants.buffer);
   context->PSSetShaderResources(1, 1, &r->atlasTexture.view);
   context->PSSetSamplers(0, 1, &r->samplerLinearWrap);
+  context->RSSetState(nullptr);
   context->OMSetBlendState(r->blendPremultiplied, nullptr, 0xFFFFFFFF);
 
   r->image = {};

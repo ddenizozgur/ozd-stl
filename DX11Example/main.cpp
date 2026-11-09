@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "../Base/File.hpp"
 #include "../Base/Math.hpp"
 #include "../Base/Random.hpp"
@@ -5,12 +7,14 @@
 #include "../DX11Stuff/RenderTarget.hpp"
 #include "../DX11Stuff/Swapchain.hpp"
 #include "../DX11Stuff/Texture.hpp"
+#include "../Misc/Camera.hpp"
 #include "../Win32Stuff/Com.hpp"
 #include "../Win32Stuff/Theme.hpp"
 #include "../Win32Stuff/WicImage.hpp"
 #include "../Win32Stuff/WindowRelated.hpp"
 #include "DebugUI.hpp"
 #include "R.hpp"
+#include "R3D.hpp"
 
 struct Example_Globals
 {
@@ -18,33 +22,6 @@ struct Example_Globals
   Win32_Input_State inputState;
 };
 inline Example_Globals g;
-
-inline constexpr Vector4<u8> PALETTE_VINIK24[] = {
-  {0x6f, 0x67, 0x76, 0xff},
-  {0x9a, 0x9a, 0x97, 0xff},
-  {0xc5, 0xcc, 0xb8, 0xff},
-  {0x8b, 0x55, 0x80, 0xff},
-  {0xc3, 0x88, 0x90, 0xff},
-  {0xa5, 0x93, 0xa5, 0xff},
-  {0x66, 0x60, 0x92, 0xff},
-  {0x9a, 0x4f, 0x50, 0xff},
-  {0xc2, 0x8d, 0x75, 0xff},
-  {0x7c, 0xa1, 0xc0, 0xff},
-  {0x41, 0x6a, 0xa3, 0xff},
-  {0x8d, 0x62, 0x68, 0xff},
-  {0xbe, 0x95, 0x5c, 0xff},
-  {0x68, 0xac, 0xa9, 0xff},
-  {0x38, 0x70, 0x80, 0xff},
-  {0x6e, 0x69, 0x62, 0xff},
-  {0x93, 0xa1, 0x67, 0xff},
-  {0x6e, 0xaa, 0x78, 0xff},
-  {0x55, 0x70, 0x64, 0xff},
-  {0x9d, 0x9f, 0x7f, 0xff},
-  {0x7e, 0x9e, 0x99, 0xff},
-  {0x5d, 0x68, 0x72, 0xff},
-  {0x43, 0x34, 0x55, 0xff},
-  {0x00, 0x00, 0x00, 0xff},
-};
 
 inline LRESULT CALLBACK ExampleWndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -119,7 +96,17 @@ int main()
   auto [r, rOk] = R_Init(&arena, gpu, dwrite);
   Defer(R_Release(&r););
 
-  bool showImage = true;
+  auto [r3d, r3dOk] = R3D_Init(gpu);
+  auto chairPath = Win32_PathFromExe(&arena, StringLit("../Assets/Chair/chair.gltf"));
+  auto [chair, chairOk] = R3D_LoadMesh(gpu, chairPath);
+  auto [depth, depthOk] = DX11_CreateDepthTarget(gpu, DX11_GetSwapchainSize(swapchain));
+  Defer(R3D_Release(&r3d);
+        R3D_ReleaseMesh(&chair);
+        DX11_ReleaseDepthTarget(&depth););
+
+  Camera3D camera = {.position = {0, 1, 3}};
+
+  bool showImage = false;
   Debug_UI debug = {.panelPosition = {16, 16}};
 
   ShowWindow(hWnd, SW_SHOWMAXIMIZED);
@@ -136,12 +123,26 @@ int main()
     DX11_WaitForBetterLatency(swapchain); // call it before handling input
     Win32_PollMessages(&g.inputState);
 
-    auto swapchainSize = Vector2Cast<u32>(g.windowState.clientSize);
-    DX11_ResizeSwapchain(gpu, &swapchain, swapchainSize);
+    DX11_ResizeSwapchain(gpu, &swapchain, Vector2Cast<u32>(g.windowState.clientSize));
     DX11_ClearBackbuffer(gpu, swapchain, {0.1f, 0.2f, 0.3f, 1});
+
+    auto backbufferSize = DX11_GetSwapchainSize(swapchain);
+    DX11_ResizeDepthTarget(gpu, &depth, backbufferSize);
+    DX11_ClearDepthTarget(gpu, depth);
+
+    {
+      Camera3DUpdate(&camera, &g.inputState, frameTime);
+      f32 aspect = static_cast<f32>(backbufferSize.width) / backbufferSize.height;
+      auto projection = Matrix4x4PerspectiveRH(RadiansFromDegreesF32(60), aspect, 0.1f, 100);
+
+      DX11_SetBackbufferAsRenderTarget(gpu, swapchain, depth);
+      R3D_Bind(&r3d);
+      R3D_DrawMesh(&r3d, chair, projection * Camera3DViewMatrix(&camera), Matrix4x4Identity());
+    }
+
     DX11_SetBackbufferAsRenderTarget(gpu, swapchain);
 
-    Vector2<f32> screenSize = Vector2Cast<f32>(swapchainSize);
+    Vector2<f32> screenSize = Vector2Cast<f32>(backbufferSize);
     {
       R_Bind(&r, screenSize);
       Defer(R_Flush(&r););
@@ -150,9 +151,9 @@ int main()
       {
         f32 imageHeight = screenSize.height * 0.6f;
         Vector2<f32> imageSize = {imageHeight * imageAspect, imageHeight};
-        Rect<f32> dst = {.position = (screenSize - imageSize) / 2.0f, .size = imageSize};
-        Rect<f32> src = {.position = {0, 0}, .size = Vector2Cast<f32>(textureSize)};
-        R_PushImage(&r, texture, dst, src, {255, 255, 255, 255}, 24);
+        Rect<f32> dstRect = {.position = (screenSize - imageSize) / 2.0f, .size = imageSize};
+        Rect<f32> srcRect = {.position = {0, 0}, .size = Vector2Cast<f32>(textureSize)};
+        R_PushImage(&r, texture, dstRect, srcRect, {255, 255, 255, 255}, 24);
       }
 
       {

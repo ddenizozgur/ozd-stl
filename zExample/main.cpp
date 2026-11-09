@@ -85,59 +85,11 @@ inline Mesh LoadMesh(Arena_Allocator *arena, String path)
 
 inline constexpr f32 WORLD_NEAR_Z = 0.1f;
 inline constexpr f32 WORLD_FAR_Z = 100;
-inline constexpr f32 CAMERA_MOVE_SPEED = 3;
-inline constexpr f32 CAMERA_LOOK_SPEED = 0.003f;
-inline constexpr f32 CAMERA_PITCH_LIMIT = RadiansFromDegreesF32(89);
 
 [[nodiscard]]
 inline Matrix4x4 WorldPerspectiveMatrix(f32 fovYRadians, f32 aspect)
 {
   return Matrix4x4PerspectiveRH(fovYRadians, aspect, WORLD_NEAR_Z, WORLD_FAR_Z);
-}
-
-inline void Camera3DUpdate(Camera3D *camera, f32 frameTime)
-{
-  auto input = &g.inputState;
-
-  static auto mouseLast = input->mousePosition;
-  auto mouseDelta = input->mousePosition - mouseLast;
-  mouseLast = input->mousePosition;
-
-  if (Win32_ButtonDown(input, Mouse_Button_Right))
-  {
-    camera->yaw += mouseDelta.x * CAMERA_LOOK_SPEED;
-    camera->pitch -= mouseDelta.y * CAMERA_LOOK_SPEED;
-    camera->pitch = Clamp(camera->pitch, -CAMERA_PITCH_LIMIT, CAMERA_PITCH_LIMIT);
-  }
-
-  auto forward = Camera3DForward(camera);
-  auto right = Camera3DRight(forward);
-  Vector3<f32> direction = {};
-  if (Win32_KeyDown(input, 'W'))
-  {
-    direction += forward;
-  }
-  if (Win32_KeyDown(input, 'S'))
-  {
-    direction -= forward;
-  }
-  if (Win32_KeyDown(input, 'D'))
-  {
-    direction += right;
-  }
-  if (Win32_KeyDown(input, 'A'))
-  {
-    direction -= right;
-  }
-  if (Win32_KeyDown(input, VK_SPACE))
-  {
-    direction.y += 1;
-  }
-  if (Win32_KeyDown(input, VK_CONTROL))
-  {
-    direction.y -= 1;
-  }
-  camera->position += direction * (CAMERA_MOVE_SPEED * frameTime);
 }
 
 [[nodiscard]]
@@ -327,7 +279,7 @@ int main()
 
     Win32_PollMessages(&g.inputState);
 
-    Camera3DUpdate(&camera, frameTime);
+    Camera3DUpdate(&camera, &g.inputState, frameTime);
     meshAngle += frameTime;
 
     {

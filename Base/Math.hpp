@@ -186,18 +186,22 @@ template <typename T>
   return insideX && insideY;
 }
 
+// top of the viewport is +1
 [[nodiscard]]
 constexpr Vector2<f32> PositionToNDC(Vector2<f32> position, Rect<i32> viewport)
 {
-  auto start = Vector2Cast<f32>(viewport.position);
-  auto end = start + Vector2Cast<f32>(viewport.size);
+  auto topLeft = Vector2Cast<f32>(viewport.position);
+  auto size = Vector2Cast<f32>(viewport.size);
+  Vector2<f32> start = {topLeft.x, topLeft.y + size.height};
+  Vector2<f32> end = {topLeft.x + size.width, topLeft.y};
   return InverseLerpF32(start, end, position) * 2 - 1;
 }
 
+// top of the viewport is +1
 [[nodiscard]]
 constexpr Vector2<f32> NDCToPosition(Vector2<f32> ndc, Rect<i32> viewport)
 {
-  auto t = InverseLerpF32(Vector2<f32>{-1.0f, -1.0f}, Vector2<f32>{1.0f, 1.0f}, ndc);
+  auto t = InverseLerpF32(Vector2<f32>{-1.0f, 1.0f}, Vector2<f32>{1.0f, -1.0f}, ndc);
   return t * Vector2Cast<f32>(viewport.size) + Vector2Cast<f32>(viewport.position);
 }
 
@@ -531,23 +535,23 @@ constexpr Matrix4x4 operator*(const Matrix4x4 &left, const Matrix4x4 &right)
           left * right.columns[3]};
 }
 
-// D3D depth, top is -1
+// D3D depth, top is +1
 [[nodiscard]]
 constexpr Matrix4x4 Matrix4x4OrthoRH(f32 left, f32 right, f32 bottom, f32 top, f32 nearZ, f32 farZ)
 {
   return {{{2 / (right - left), 0, 0, 0},
-           {0, 2 / (bottom - top), 0, 0},
+           {0, 2 / (top - bottom), 0, 0},
            {0, 0, 1 / (nearZ - farZ), 0},
-           {-(right + left) / (right - left), (top + bottom) / (top - bottom), nearZ / (nearZ - farZ), 1}}};
+           {-(right + left) / (right - left), -(top + bottom) / (top - bottom), nearZ / (nearZ - farZ), 1}}};
 }
 
-// D3D depth, top is -1
+// D3D depth, top is +1
 [[nodiscard]]
 inline Matrix4x4 Matrix4x4PerspectiveRH(f32 fovYRadians, f32 aspect, f32 nearZ, f32 farZ)
 {
   f32 focal = 1 / tanf(fovYRadians / 2);
   return {{{focal / aspect, 0, 0, 0},
-           {0, -focal, 0, 0},
+           {0, focal, 0, 0},
            {0, 0, farZ / (nearZ - farZ), -1},
            {0, 0, nearZ * farZ / (nearZ - farZ), 0}}};
 }

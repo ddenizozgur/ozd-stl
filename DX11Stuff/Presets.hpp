@@ -81,6 +81,14 @@ inline constexpr D3D11_RASTERIZER_DESC DX11_RASTERIZER_DESC_CULL_BACK = {
   .DepthClipEnable = true,
 };
 
+// counter-clockwise triangles are the front faces
+inline constexpr D3D11_RASTERIZER_DESC DX11_RASTERIZER_DESC_CULL_BACK_CCW = {
+  .FillMode = D3D11_FILL_SOLID,
+  .CullMode = D3D11_CULL_BACK,
+  .FrontCounterClockwise = true,
+  .DepthClipEnable = true,
+};
+
 // draws both sides
 inline constexpr D3D11_RASTERIZER_DESC DX11_RASTERIZER_DESC_NO_CULL = {
   .FillMode = D3D11_FILL_SOLID,
