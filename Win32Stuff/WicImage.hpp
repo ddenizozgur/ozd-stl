@@ -24,6 +24,8 @@ inline const GUID &Win32_WicPixelFormatFrom_(Image_Format format)
 {
   switch (format)
   {
+  case Image_Format_RGBA8:
+    return GUID_WICPixelFormat32bppRGBA;
   case Image_Format_BGRA8:
     return GUID_WICPixelFormat32bppBGRA;
   case Image_Format_BGRA8Premultiplied:
@@ -41,6 +43,7 @@ inline const GUID &Win32_WicPixelFormatFrom_(Image_Format format)
   case Image_Format_RGBA32Float:
     return GUID_WICPixelFormat128bppRGBAFloat;
   default:
+    assert(false && "unknown image format");
     return GUID_WICPixelFormat32bppRGBA;
   }
 }
@@ -50,6 +53,8 @@ inline const GUID &Win32_WicContainerFrom_(Image_File_Format format)
 {
   switch (format)
   {
+  case Image_File_Format_Png:
+    return GUID_ContainerFormatPng;
   case Image_File_Format_Jpeg:
     return GUID_ContainerFormatJpeg;
   case Image_File_Format_Tiff:

@@ -27,12 +27,18 @@ constexpr u32 ImageFormatBytesPerPixel(Image_Format format)
     return 1;
   case Image_Format_Gray16:
     return 2;
+  case Image_Format_RGBA8:
+  case Image_Format_RGBA8Premultiplied:
+  case Image_Format_BGRA8:
+  case Image_Format_BGRA8Premultiplied:
+    return 4;
   case Image_Format_RGBA16:
   case Image_Format_RGBA16Float:
     return 8;
   case Image_Format_RGBA32Float:
     return 16;
   default:
+    assert(false && "unknown image format");
     return 4;
   }
 }

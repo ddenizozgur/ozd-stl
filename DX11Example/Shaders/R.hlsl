@@ -11,10 +11,11 @@ static const uint KIND_IMAGE = 2;
 
 struct Instance
 {
-  float2 position; // top-left in pixels
-  float2 size;
-  float2 atlasPosition;
-  uint color; // straight alpha
+  float2 dstPosition;
+  float2 dstSize;
+  float2 srcPosition;
+  float2 srcSize;
+  uint color;
   uint kind;
   float cornerRadius;
   float borderThickness;
@@ -28,14 +29,13 @@ SamplerState linearSampler : register(s0);
 struct Pixel
 {
   float4 position : SV_Position;
-  nointerpolation float2 screenToAtlas : ATLAS;
+  float2 src : SRC; // texels
   nointerpolation float4 color : COLOR;
   nointerpolation uint kind : KIND;
   nointerpolation float2 center : CENTER;
   nointerpolation float2 halfSize : HALFSIZE;
   nointerpolation float cornerRadius : RADIUS;
   nointerpolation float borderThickness : BORDER;
-  float2 uv : TEXCOORD;
 };
 
 float4 UnpackRGBA8(uint packed)
@@ -49,18 +49,17 @@ Pixel VSMain(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
 
   // TL, TR, BL, BR
   float2 corner = float2(vertexId & 1, vertexId >> 1);
-  float2 pixelPosition = instance.position + corner * instance.size;
+  float2 pixelPosition = instance.dstPosition + corner * instance.dstSize;
 
   Pixel pixel;
   pixel.position = float4(pixelPosition / screenSize * float2(2, -2) + float2(-1, 1), 0, 1);
-  pixel.screenToAtlas = instance.atlasPosition - instance.position;
+  pixel.src = instance.srcPosition + corner * instance.srcSize;
   pixel.color = UnpackRGBA8(instance.color);
   pixel.kind = instance.kind;
-  pixel.halfSize = instance.size * 0.5;
-  pixel.center = instance.position + pixel.halfSize;
+  pixel.halfSize = instance.dstSize * 0.5;
+  pixel.center = instance.dstPosition + pixel.halfSize;
   pixel.cornerRadius = min(instance.cornerRadius, min(pixel.halfSize.x, pixel.halfSize.y));
   pixel.borderThickness = instance.borderThickness;
-  pixel.uv = corner;
   return pixel;
 }
 
@@ -90,14 +89,15 @@ float4 PSMain(Pixel pixel) : SV_Target
   float4 color = float4(pixel.color.rgb * pixel.color.a, pixel.color.a);
   if (pixel.kind == KIND_GLYPH)
   {
-    int2 texel = int2(pixel.position.xy + pixel.screenToAtlas);
-    float coverage = atlas.Load(int3(texel, 0));
+    float coverage = atlas.Load(int3(int2(pixel.src), 0));
     return color * GammaCorrectedAlpha(coverage, pixel.color.rgb);
   }
 
   if (pixel.kind == KIND_IMAGE)
   {
-    color *= image.Sample(linearSampler, pixel.uv);
+    float width, height;
+    image.GetDimensions(width, height);
+    color *= image.Sample(linearSampler, pixel.src / float2(width, height));
   }
 
   float distance = SdRoundedBox(pixel.position.xy - pixel.center, pixel.halfSize, pixel.cornerRadius);

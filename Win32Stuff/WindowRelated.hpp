@@ -346,9 +346,14 @@ Win32_ButtonReleased(const Win32_Input_State *inputState, Mouse_Button button)
 [[nodiscard]]
 inline u8 Win32_MouseButtonBit(UINT message, WPARAM wParam)
 {
-  Mouse_Button button = Mouse_Button_Left;
+  Mouse_Button button{};
   switch (message)
   {
+  case WM_LBUTTONDOWN:
+  case WM_LBUTTONDBLCLK:
+  case WM_LBUTTONUP:
+    button = Mouse_Button_Left;
+    break;
   case WM_RBUTTONDOWN:
   case WM_RBUTTONDBLCLK:
   case WM_RBUTTONUP:
@@ -363,6 +368,10 @@ inline u8 Win32_MouseButtonBit(UINT message, WPARAM wParam)
   case WM_XBUTTONDBLCLK:
   case WM_XBUTTONUP:
     button = GET_XBUTTON_WPARAM(wParam) == XBUTTON1 ? Mouse_Button_X1 : Mouse_Button_X2;
+    break;
+  default:
+    assert(false && "not a mouse button message");
+    button = Mouse_Button_Left;
     break;
   }
   return static_cast<u8>(1 << button);

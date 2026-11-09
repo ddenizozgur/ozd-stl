@@ -2,7 +2,7 @@
 
 #include "../DX11Stuff/Buffers.hpp"
 #include "../DX11Stuff/Texture.hpp"
-#include "../Win32Stuff/GlyphAtlas.hpp"
+#include "../Misc/GlyphAtlas.hpp"
 
 using R_Kind = u32;
 enum : R_Kind
@@ -14,10 +14,11 @@ enum : R_Kind
 
 struct R_Instance
 {
-  Vector2<f32> position; // top-left in pixels
-  Vector2<f32> size;
-  Vector2<f32> atlasPosition;
-  Vector4<u8> color; // RGBA, straight alpha
+  Vector2<f32> dstPosition;
+  Vector2<f32> dstSize;
+  Vector2<f32> srcPosition;
+  Vector2<f32> srcSize;
+  Vector4<u8> color; // RGBA
   R_Kind kind;
   f32 cornerRadius;
   f32 borderThickness;
@@ -34,6 +35,7 @@ struct R_Batch
 {
   Fixed_List<R_Instance> instances;
   DX11_Transient_Buffer gpuInstances;
+  DX11_Texture2D image;
 };
 
 [[nodiscard]]
@@ -75,12 +77,12 @@ inline void R_Push(DX11_GPU gpu, R_Batch *batch, R_Instance instance)
 }
 
 inline void R_PushRect(DX11_GPU gpu, R_Batch *batch,
-                       Vector2<f32> position, Vector2<f32> size,
+                       Vector2<f32> dstPosition, Vector2<f32> dstSize,
                        Vector4<u8> color, f32 cornerRadius = 0, f32 borderThickness = 0)
 {
   R_Instance instance = {
-    .position = position,
-    .size = size,
+    .dstPosition = dstPosition,
+    .dstSize = dstSize,
     .color = color,
     .kind = R_Kind_Rect,
     .cornerRadius = cornerRadius,
@@ -89,14 +91,24 @@ inline void R_PushRect(DX11_GPU gpu, R_Batch *batch,
   R_Push(gpu, batch, instance);
 }
 
-inline void R_PushImage(DX11_GPU gpu, R_Batch *batch,
-                        Vector2<f32> position, Vector2<f32> size,
+inline void R_PushImage(DX11_GPU gpu, R_Batch *batch, DX11_Texture2D image,
+                        Vector2<f32> dstPosition, Vector2<f32> dstSize,
+                        Vector2<f32> srcPosition, Vector2<f32> srcSize,
                         Vector4<u8> color = {255, 255, 255, 255},
                         f32 cornerRadius = 0, f32 borderThickness = 0)
 {
+  if (batch->image.view != image.view)
+  {
+    R_Flush(gpu, batch);
+    batch->image = image;
+    gpu.immediateContext1->PSSetShaderResources(2, 1, &image.view);
+  }
+
   R_Instance instance = {
-    .position = position,
-    .size = size,
+    .dstPosition = dstPosition,
+    .dstSize = dstSize,
+    .srcPosition = srcPosition,
+    .srcSize = srcSize,
     .color = color,
     .kind = R_Kind_Image,
     .cornerRadius = cornerRadius,
@@ -142,9 +154,10 @@ inline Vector2<f32> R_PushText(DX11_GPU gpu, R_Batch *batch, Glyph_Atlas *atlas,
       f32 top = (pen.y + shaped.offset.y) + glyph.offset.y;
 
       R_Instance instance = {
-        .position = {left, top},
-        .size = Vector2Cast<f32>(glyph.size),
-        .atlasPosition = Vector2Cast<f32>(glyph.position),
+        .dstPosition = {left, top},
+        .dstSize = Vector2Cast<f32>(glyph.size),
+        .srcPosition = Vector2Cast<f32>(glyph.position),
+        .srcSize = Vector2Cast<f32>(glyph.size),
         .color = color,
         .kind = R_Kind_Glyph,
       };

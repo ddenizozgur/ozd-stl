@@ -92,9 +92,12 @@ inline DXGI_FORMAT DX11_TextureFormatFromImage(Image_Format format, bool srgb)
   case Image_Format_RGBA8:
   case Image_Format_RGBA8Premultiplied:
     return srgb ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
+  case Image_Format_BGRA8:
+  case Image_Format_BGRA8Premultiplied:
+    return srgb ? DXGI_FORMAT_B8G8R8A8_UNORM_SRGB : DXGI_FORMAT_B8G8R8A8_UNORM;
   }
 
-  assert(!srgb && "only RGBA8 has an sRGB version");
+  assert(!srgb && "only the 8-bit color formats have an sRGB version");
   switch (format)
   {
   case Image_Format_Gray8:
@@ -105,8 +108,11 @@ inline DXGI_FORMAT DX11_TextureFormatFromImage(Image_Format format, bool srgb)
     return DXGI_FORMAT_R16_UNORM;
   case Image_Format_RGBA16Float:
     return DXGI_FORMAT_R16G16B16A16_FLOAT;
-  default:
+  case Image_Format_RGBA32Float:
     return DXGI_FORMAT_R32G32B32A32_FLOAT;
+  default:
+    assert(false && "unknown image format");
+    return DXGI_FORMAT_R8G8B8A8_UNORM;
   }
 }
 

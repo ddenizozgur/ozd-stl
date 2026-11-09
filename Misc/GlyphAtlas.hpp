@@ -2,7 +2,7 @@
 
 #include "../Base/ShelfPacker.hpp"
 #include "../Vendor/rapidhash.h"
-#include "DWrite.hpp"
+#include "../Win32Stuff/DWrite.hpp"
 
 // NOTE: check twice for padding
 struct Glyph_Atlas_Key
@@ -14,9 +14,9 @@ struct Glyph_Atlas_Key
 
 struct Glyph_Atlas_Slot
 {
-  Vector2<u32> position; // top-left in the atlas
+  Vector2<u32> position;
   Vector2<u32> size;
-  Vector2<i32> offset; // top-left of coverage
+  Vector2<i32> offset;
 };
 
 [[nodiscard]] inline u64 GlyphAtlasKeyHash(Glyph_Atlas_Key key)

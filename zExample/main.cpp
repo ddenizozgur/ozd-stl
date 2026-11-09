@@ -337,7 +337,7 @@ int main()
       R_Clear(&frameBuffer, {0x44, 0x33, 0x22, 0xff}, true);
       Defer(R_PresentFrameBuffer(hWnd, hDC, frameBuffer););
 
-      R_HexDump(&frameBuffer, R_FONT_3DFX, {}, (void *)main, 16, 48);
+      // R_HexDump(&frameBuffer, R_FONT_3DFX, {}, (void *)main, 8, 64);
 
       auto fbSizeF32 = Vector2Cast<f32>(frameBuffer.size);
       auto aspectRatio = fbSizeF32.width / fbSizeF32.height;
@@ -349,7 +349,7 @@ int main()
         // Matrix4x4Shear(0.5f, 0, 0, 0, 0, 0) *
         Matrix4x4Scale({1, 1, 1});
 
-      DrawMesh(&frameBuffer, viewProjection * model, modelMesh);
+      DrawMesh(&frameBuffer, viewProjection * model, modelMesh, Mesh_Draw_Kind_Default);
       DrawWorldAxes(&frameBuffer, viewProjection, R_FONT_3DFX);
     }
 

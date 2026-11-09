@@ -9,7 +9,6 @@
 #include "../DX11Stuff/Swapchain.hpp"
 #include "../DX11Stuff/Texture.hpp"
 #include "../Win32Stuff/Com.hpp"
-#include "../Win32Stuff/GlyphAtlas.hpp"
 #include "../Win32Stuff/Theme.hpp"
 #include "../Win32Stuff/WicImage.hpp"
 #include "../Win32Stuff/WindowRelated.hpp"
@@ -86,7 +85,8 @@ int main()
   Defer(Win32_UninitComOnThread(&com););
 
   auto [classId, classOk] = Win32_RegisterWindowClass(StringLit("DX11ExampleClass"), ExampleWndProc);
-  auto hWnd = Win32_CreateWindow(classId, StringLit("DX11Example"), {1600, 900}, Window_Kind_Normal, WS_EX_NOREDIRECTIONBITMAP);
+  auto hWnd = Win32_CreateWindow(classId, StringLit("DX11Example"), {1600, 900},
+                                 Window_Kind_Normal, WS_EX_NOREDIRECTIONBITMAP);
   Win32_SetDarkTheme(hWnd, Window_Backdrop_Acrylic);
   Win32_SetWindowCorners(hWnd, Window_Corners_RoundSmall);
 
@@ -106,10 +106,10 @@ int main()
   auto [texture, textureOk] = DX11_CreateTexture2D(gpu, image.pixels, image.size, textureFormat, true);
   Defer(DX11_ReleaseTexture2D(&texture););
 
-  auto sampler = DX11_CreateSamplerState(gpu, DX11_SAMPLER_DESC_LINEAR_WRAP);
-  auto blend = DX11_CreateBlendState(gpu, DX11_BLEND_DESC_PREMULTIPLIED_ALPHA);
-  Defer(Win32_ComSafeRelease(&sampler);
-        Win32_ComSafeRelease(&blend););
+  auto samplerLinearWrap = DX11_CreateSamplerState(gpu, DX11_SAMPLER_DESC_LINEAR_WRAP);
+  auto blendPremultiplied = DX11_CreateBlendState(gpu, DX11_BLEND_DESC_PREMULTIPLIED_ALPHA);
+  Defer(Win32_ComSafeRelease(&samplerLinearWrap);
+        Win32_ComSafeRelease(&blendPremultiplied););
 
   auto textureSize = DX11_GetTexture2DSize(texture);
   auto imageAspect = static_cast<f32>(textureSize.width) / textureSize.height;
@@ -121,7 +121,7 @@ int main()
   auto pixelShader = DX11_CreatePixelShader(gpu, psBytes);
   auto [constantsGpu, constantsGpuOk] = DX11_CreateConstantBuffer(gpu, sizeof(R_Constants));
 
-  auto instances = ArenaPushSlice<R_Instance>(&arena, 16 * 1024);
+  auto instances = ArenaPushSlice<R_Instance>(&arena, Kilobytes(32) / sizeof(R_Instance));
   auto [batch, batchOk] = R_InitBatch(gpu, instances);
   Defer(Win32_ComSafeRelease(&vertexShader);
         Win32_ComSafeRelease(&pixelShader);
@@ -146,8 +146,8 @@ int main()
   bool showImage = true;
   Debug_UI debug = {.panelPosition = {16, 16}};
 
-  // ShowWindow(hWnd, SW_SHOWMAXIMIZED);
-  ShowWindow(hWnd, SW_SHOW);
+  ShowWindow(hWnd, SW_SHOWMAXIMIZED);
+  // ShowWindow(hWnd, SW_SHOW);
   auto timeLast = Win32_NowNanoseconds();
 
   for (; !g.windowState.destroyed;)
@@ -180,10 +180,9 @@ int main()
       context->VSSetShaderResources(0, 1, &batch.gpuInstances.view);
       context->PSSetShader(pixelShader, nullptr, 0);
       context->PSSetConstantBuffers(0, 1, &constantsGpu.buffer);
-      ID3D11ShaderResourceView *pixelResources[] = {atlasTexture.view, texture.view};
-      context->PSSetShaderResources(1, static_cast<u32>(ArrayCount(pixelResources)), pixelResources);
-      context->PSSetSamplers(0, 1, &sampler);
-      context->OMSetBlendState(blend, nullptr, 0xFFFFFFFF);
+      context->PSSetShaderResources(1, 1, &atlasTexture.view);
+      context->PSSetSamplers(0, 1, &samplerLinearWrap);
+      context->OMSetBlendState(blendPremultiplied, nullptr, 0xFFFFFFFF);
 
       Vector2<f32> screenSize = constantsFrame.screenSize;
 
@@ -191,7 +190,8 @@ int main()
       {
         f32 imageHeight = screenSize.height * 0.6f;
         Vector2<f32> imageSize = {imageHeight * imageAspect, imageHeight};
-        R_PushImage(gpu, &batch, (screenSize - imageSize) / 2.0f, imageSize, {255, 255, 255, 255}, 24);
+        R_PushImage(gpu, &batch, texture, (screenSize - imageSize) / 2.0f, imageSize,
+                    {0, 0}, Vector2Cast<f32>(textureSize), {255, 255, 255, 255}, 24);
       }
 
       {
