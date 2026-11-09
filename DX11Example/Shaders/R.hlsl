@@ -29,7 +29,7 @@ SamplerState linearSampler : register(s0);
 struct Pixel
 {
   float4 position : SV_Position;
-  float2 src : SRC; // texels
+  float2 texel : TEXEL;
   nointerpolation float4 color : COLOR;
   nointerpolation uint kind : KIND;
   nointerpolation float2 center : CENTER;
@@ -53,7 +53,7 @@ Pixel VSMain(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
 
   Pixel pixel;
   pixel.position = float4(pixelPosition / screenSize * float2(2, -2) + float2(-1, 1), 0, 1);
-  pixel.src = instance.srcPosition + corner * instance.srcSize;
+  pixel.texel = instance.srcPosition + corner * instance.srcSize;
   pixel.color = UnpackRGBA8(instance.color);
   pixel.kind = instance.kind;
   pixel.halfSize = instance.dstSize * 0.5;
@@ -89,7 +89,7 @@ float4 PSMain(Pixel pixel) : SV_Target
   float4 color = float4(pixel.color.rgb * pixel.color.a, pixel.color.a);
   if (pixel.kind == KIND_GLYPH)
   {
-    float coverage = atlas.Load(int3(int2(pixel.src), 0));
+    float coverage = atlas.Load(int3(int2(pixel.texel), 0));
     return color * GammaCorrectedAlpha(coverage, pixel.color.rgb);
   }
 
@@ -97,7 +97,7 @@ float4 PSMain(Pixel pixel) : SV_Target
   {
     float width, height;
     image.GetDimensions(width, height);
-    color *= image.Sample(linearSampler, pixel.src / float2(width, height));
+    color *= image.Sample(linearSampler, pixel.texel / float2(width, height));
   }
 
   float distance = SdRoundedBox(pixel.position.xy - pixel.center, pixel.halfSize, pixel.cornerRadius);

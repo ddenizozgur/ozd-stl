@@ -2,10 +2,7 @@
 #include "../Base/Math.hpp"
 #include "../Base/Random.hpp"
 #include "../Base/Time.hpp"
-#include "../DX11Stuff/Buffers.hpp"
-#include "../DX11Stuff/Presets.hpp"
 #include "../DX11Stuff/RenderTarget.hpp"
-#include "../DX11Stuff/Shader.hpp"
 #include "../DX11Stuff/Swapchain.hpp"
 #include "../DX11Stuff/Texture.hpp"
 #include "../Win32Stuff/Com.hpp"
@@ -106,42 +103,21 @@ int main()
   auto [texture, textureOk] = DX11_CreateTexture2D(gpu, image.pixels, image.size, textureFormat, true);
   Defer(DX11_ReleaseTexture2D(&texture););
 
-  auto samplerLinearWrap = DX11_CreateSamplerState(gpu, DX11_SAMPLER_DESC_LINEAR_WRAP);
-  auto blendPremultiplied = DX11_CreateBlendState(gpu, DX11_BLEND_DESC_PREMULTIPLIED_ALPHA);
-  Defer(Win32_ComSafeRelease(&samplerLinearWrap);
-        Win32_ComSafeRelease(&blendPremultiplied););
-
   auto textureSize = DX11_GetTexture2DSize(texture);
   auto imageAspect = static_cast<f32>(textureSize.width) / textureSize.height;
 
-  auto shaderPath = Win32_PathFromExe(&arena, StringLit("../Shaders/R.hlsl"));
-  auto [vsBytes, vsOk] = DX11_CompileShaderFromFile(&arena, shaderPath, "VSMain", DX11_VERTEX_SHADER_TARGET);
-  auto [psBytes, psOk] = DX11_CompileShaderFromFile(&arena, shaderPath, "PSMain", DX11_PIXEL_SHADER_TARGET);
-  auto vertexShader = DX11_CreateVertexShader(gpu, vsBytes);
-  auto pixelShader = DX11_CreatePixelShader(gpu, psBytes);
-  auto [constantsGpu, constantsGpuOk] = DX11_CreateConstantBuffer(gpu, sizeof(R_Constants));
-
-  auto instances = ArenaPushSlice<R_Instance>(&arena, Kilobytes(32) / sizeof(R_Instance));
-  auto [batch, batchOk] = R_InitBatch(gpu, instances);
-  Defer(Win32_ComSafeRelease(&vertexShader);
-        Win32_ComSafeRelease(&pixelShader);
-        DX11_ReleaseConstantBuffer(&constantsGpu);
-        R_ReleaseBatch(&batch););
-
   auto dwrite = Win32_CreateDWrite();
-  auto blendParams = Win32_DWriteBlendParams(dwrite);
   // String fontPaths[] = {Win32_PathFromExe(&arena, StringLit("../Assets/JetBrainsMono-Regular.ttf"))};
   // auto fontFiles = Win32_DWriteCollectionFromFiles(dwrite, SliceFromArray(fontPaths));
   // auto [font, fontOk] = Win32_DWriteFontFromCollection(fontFiles, StringLit("JetBrains Mono"));
   auto fontFiles = Win32_DWriteCollectionFromSystem(dwrite);
   auto [font, fontOk] = Win32_DWriteFontFromCollection(fontFiles, StringLit("Consolas"));
-  auto [atlas, atlasOk] = GlyphAtlasInit(&arena, {1024, 1024});
-  auto [atlasTexture, atlasTextureOk] = DX11_CreateTexture2D(gpu, atlas.coverage, atlas.size, DXGI_FORMAT_R8_UNORM, false, true);
-  Defer(DX11_ReleaseTexture2D(&atlasTexture);
-        GlyphAtlasRelease(&atlas);
-        Win32_DWriteReleaseFont(&font);
+  Defer(Win32_DWriteReleaseFont(&font);
         Win32_DWriteReleaseCollection(dwrite, &fontFiles);
         Win32_ReleaseDWrite(&dwrite););
+
+  auto [r, rOk] = R_Init(&arena, gpu, dwrite);
+  Defer(R_Release(&r););
 
   bool showImage = true;
   Debug_UI debug = {.panelPosition = {16, 16}};
@@ -159,58 +135,33 @@ int main()
 
     DX11_WaitForBetterLatency(swapchain); // call it before handling input
     Win32_PollMessages(&g.inputState);
+
     auto swapchainSize = Vector2Cast<u32>(g.windowState.clientSize);
     DX11_ResizeSwapchain(gpu, &swapchain, swapchainSize);
+    DX11_ClearBackbuffer(gpu, swapchain, {0.1f, 0.2f, 0.3f, 1});
+    DX11_SetBackbufferAsRenderTarget(gpu, swapchain);
 
+    Vector2<f32> screenSize = Vector2Cast<f32>(swapchainSize);
     {
-      R_Constants constantsFrame = {
-        .gammaRatios = blendParams.gammaRatios,
-        .screenSize = Vector2Cast<f32>(swapchainSize),
-        .enhancedContrast = blendParams.enhancedContrast,
-      };
-      DX11_UpdateConstantBuffer(gpu, constantsGpu, SliceAsBytes(SliceMake(&constantsFrame, 1)));
-
-      DX11_ClearBackbuffer(gpu, swapchain, {0.1f, 0.2f, 0.3f, 1});
-      DX11_SetBackbufferAsRenderTarget(gpu, swapchain);
-
-      auto context = gpu.immediateContext1;
-      context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-      context->VSSetShader(vertexShader, nullptr, 0);
-      context->VSSetConstantBuffers(0, 1, &constantsGpu.buffer);
-      context->VSSetShaderResources(0, 1, &batch.gpuInstances.view);
-      context->PSSetShader(pixelShader, nullptr, 0);
-      context->PSSetConstantBuffers(0, 1, &constantsGpu.buffer);
-      context->PSSetShaderResources(1, 1, &atlasTexture.view);
-      context->PSSetSamplers(0, 1, &samplerLinearWrap);
-      context->OMSetBlendState(blendPremultiplied, nullptr, 0xFFFFFFFF);
-
-      Vector2<f32> screenSize = constantsFrame.screenSize;
+      R_Bind(&r, screenSize);
+      Defer(R_Flush(&r););
 
       if (showImage)
       {
         f32 imageHeight = screenSize.height * 0.6f;
         Vector2<f32> imageSize = {imageHeight * imageAspect, imageHeight};
-        R_PushImage(gpu, &batch, texture, (screenSize - imageSize) / 2.0f, imageSize,
-                    {0, 0}, Vector2Cast<f32>(textureSize), {255, 255, 255, 255}, 24);
+        Rect<f32> dst = {.position = (screenSize - imageSize) / 2.0f, .size = imageSize};
+        Rect<f32> src = {.position = {0, 0}, .size = Vector2Cast<f32>(textureSize)};
+        R_PushImage(&r, texture, dst, src, {255, 255, 255, 255}, 24);
       }
 
       {
-        Debug_Renderer debugRenderer = {
-          .gpu = gpu,
-          .batch = &batch,
-          .atlas = &atlas,
-          .atlasTexture = atlasTexture,
-          .dwrite = dwrite,
-          .font = font,
-        };
-        Debug_Begin(&debug, &g.inputState, debugRenderer, StringLit("Debug"));
+        Debug_Begin(&debug, &g.inputState, &r, font, StringLit("Debug"));
 
         Debug_Checkbox(&debug, &showImage, StringLit("Show image"));
         auto debugHasMouse = Debug_End(&debug);
         (void)debugHasMouse;
       }
-
-      R_Flush(gpu, &batch);
     }
 
     DX11_PresentSwapchain(swapchain, 0);
