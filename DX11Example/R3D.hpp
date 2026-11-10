@@ -8,15 +8,14 @@
 #include "../DX11Stuff/Shader.hpp"
 #include "../Misc/GLTF.hpp"
 
-struct alignas(16) R3D_Constants
+struct alignas(16) R3D_Frame_Constants
 {
-  Matrix4x4 toClip;
+  Matrix4x4 viewProjectionMatrix;
 };
 
-struct R3D_Mesh
+struct alignas(16) R3D_Mesh_Constants
 {
-  DX11_Storage_Buffer positions;
-  DX11_Index_Buffer indices;
+  Matrix4x4 modelMatrix;
 };
 
 struct R3D_State
@@ -27,7 +26,9 @@ struct R3D_State
   ID3D11PixelShader *pixelShader;
   ID3D11RasterizerState *rasterizerCullBack;
   ID3D11DepthStencilState *depthLess;
-  DX11_Constant_Buffer constants;
+  ID3D11SamplerState *samplerLinearWrap;
+  DX11_Constant_Buffer frameConstants;
+  DX11_Constant_Buffer meshConstants;
 };
 
 [[nodiscard]]
@@ -39,7 +40,8 @@ inline Pair<R3D_State, bool> R3D_Init(DX11_GPU gpu)
   auto shaderPath = Win32_PathFromExe(scratch.arena, StringLit("../Shaders/R3D.hlsl"));
   auto [vsBytes, vsOk] = DX11_CompileShaderFromFile(scratch.arena, shaderPath, "VSMain", DX11_VERTEX_SHADER_TARGET);
   auto [psBytes, psOk] = DX11_CompileShaderFromFile(scratch.arena, shaderPath, "PSMain", DX11_PIXEL_SHADER_TARGET);
-  auto [constants, constantsOk] = DX11_CreateConstantBuffer(gpu, sizeof(R3D_Constants));
+  auto [frameConstants, frameConstantsOk] = DX11_CreateConstantBuffer(gpu, sizeof(R3D_Frame_Constants));
+  auto [meshConstants, meshConstantsOk] = DX11_CreateConstantBuffer(gpu, sizeof(R3D_Mesh_Constants));
 
   R3D_State r3d = {
     .gpu = gpu,
@@ -47,19 +49,31 @@ inline Pair<R3D_State, bool> R3D_Init(DX11_GPU gpu)
     .pixelShader = DX11_CreatePixelShader(gpu, psBytes),
     .rasterizerCullBack = DX11_CreateRasterizerState(gpu, DX11_RASTERIZER_DESC_CULL_BACK_CCW),
     .depthLess = DX11_CreateDepthState(gpu, DX11_DEPTH_DESC_LESS),
-    .constants = constants,
+    .samplerLinearWrap = DX11_CreateSamplerState(gpu, DX11_SAMPLER_DESC_LINEAR_WRAP),
+    .frameConstants = frameConstants,
+    .meshConstants = meshConstants,
   };
-  return {r3d, vsOk && psOk && constantsOk};
+  return {r3d, vsOk && psOk && frameConstantsOk && meshConstantsOk};
 }
 
 inline void R3D_Release(R3D_State *r3d)
 {
-  DX11_ReleaseConstantBuffer(&r3d->constants);
+  DX11_ReleaseConstantBuffer(&r3d->meshConstants);
+  DX11_ReleaseConstantBuffer(&r3d->frameConstants);
+  Win32_ComSafeRelease(&r3d->samplerLinearWrap);
   Win32_ComSafeRelease(&r3d->depthLess);
   Win32_ComSafeRelease(&r3d->rasterizerCullBack);
   Win32_ComSafeRelease(&r3d->pixelShader);
   Win32_ComSafeRelease(&r3d->vertexShader);
 }
+
+struct R3D_Mesh
+{
+  DX11_Storage_Buffer positions;
+  DX11_Storage_Buffer texcoords;
+  DX11_Index_Buffer indices;
+  DX11_Texture2D albedo;
+};
 
 // loads the first primitive of the first mesh
 [[nodiscard]]
@@ -86,38 +100,58 @@ inline Pair<R3D_Mesh, bool> R3D_LoadMesh(DX11_GPU gpu, String gltfPath)
 
   auto primitive = &data->meshes[0].primitives[0];
   auto positions = GLTF_LoadPositions(scratch.arena, primitive);
+  auto texcoords = GLTF_LoadTexcoords(scratch.arena, primitive, 0);
   auto indices = GLTF_LoadIndices(scratch.arena, primitive);
+  auto [albedo, albedoOk] = GLTF_LoadAlbedo(scratch.arena, primitive, Image_Format_RGBA8, gltfPath);
+  if (!albedoOk)
+  { // TODO:
+    return {};
+  }
 
-  auto [positionsGpu, positionsOk] = DX11_CreateStorageBuffer(gpu, SliceAsBytes(positions), sizeof(Vector3<f32>));
-  auto [indicesGpu, indicesOk] = DX11_CreateIndexBuffer(gpu, indices);
-  return {{positionsGpu, indicesGpu}, positionsOk && indicesOk};
+  auto [positionsGpu, positionsGpuOk] = DX11_CreateStorageBuffer(gpu, SliceAsBytes(positions), sizeof(Vector3<f32>));
+  auto [texcoordsGpu, texcoordsGpuOk] = DX11_CreateStorageBuffer(gpu, SliceAsBytes(texcoords), sizeof(Vector2<f32>));
+  auto [indicesGpu, indicesGpuOk] = DX11_CreateIndexBuffer(gpu, indices);
+  auto [albedoGpu, albedoGpuOk] = DX11_CreateTexture2D(gpu, albedo.pixels, albedo.size,
+                                                       DX11_TextureFormatFromImage(albedo.format, true),
+                                                       true, false);
+  return {{positionsGpu, texcoordsGpu, indicesGpu, albedoGpu},
+          positionsGpuOk && texcoordsGpuOk && indicesGpuOk && albedoGpuOk};
 }
 
 inline void R3D_ReleaseMesh(R3D_Mesh *mesh)
 {
   DX11_ReleaseIndexBuffer(&mesh->indices);
+  DX11_ReleaseStorageBuffer(&mesh->texcoords);
   DX11_ReleaseStorageBuffer(&mesh->positions);
+  DX11_ReleaseTexture2D(&mesh->albedo);
 }
 
-inline void R3D_Bind(R3D_State *r3d)
+inline void R3D_Bind(R3D_State *r3d, const Matrix4x4 &viewProjection)
 {
+  R3D_Frame_Constants constants = {.viewProjectionMatrix = viewProjection};
+  DX11_UpdateConstantBuffer(r3d->gpu, r3d->frameConstants, SliceAsBytes(SliceMake(&constants, 1)));
+
   auto context = r3d->gpu.immediateContext1;
   context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
   context->VSSetShader(r3d->vertexShader, nullptr, 0);
-  context->VSSetConstantBuffers(0, 1, &r3d->constants.buffer);
+  ID3D11Buffer *vertexConstants[] = {r3d->frameConstants.buffer, r3d->meshConstants.buffer};
+  context->VSSetConstantBuffers(0, 2, vertexConstants);
   context->PSSetShader(r3d->pixelShader, nullptr, 0);
+  context->PSSetSamplers(0, 1, &r3d->samplerLinearWrap);
   context->RSSetState(r3d->rasterizerCullBack);
   context->OMSetDepthStencilState(r3d->depthLess, 0);
   context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
 }
 
-inline void R3D_DrawMesh(R3D_State *r3d, R3D_Mesh mesh, const Matrix4x4 &viewProjection, const Matrix4x4 &world)
+inline void R3D_DrawMesh(R3D_State *r3d, R3D_Mesh mesh, const Matrix4x4 &model)
 {
-  R3D_Constants constants = {.toClip = viewProjection * world};
-  DX11_UpdateConstantBuffer(r3d->gpu, r3d->constants, SliceAsBytes(SliceMake(&constants, 1)));
+  R3D_Mesh_Constants constants = {.modelMatrix = model};
+  DX11_UpdateConstantBuffer(r3d->gpu, r3d->meshConstants, SliceAsBytes(SliceMake(&constants, 1)));
 
   auto context = r3d->gpu.immediateContext1;
-  context->VSSetShaderResources(0, 1, &mesh.positions.view);
+  ID3D11ShaderResourceView *vertexViews[] = {mesh.positions.view, mesh.texcoords.view};
+  context->VSSetShaderResources(0, 2, vertexViews);
+  context->PSSetShaderResources(2, 1, &mesh.albedo.view);
   context->IASetIndexBuffer(mesh.indices.buffer, DXGI_FORMAT_R32_UINT, 0);
   context->DrawIndexed(DX11_GetIndexCount(mesh.indices), 0, 0);
 }

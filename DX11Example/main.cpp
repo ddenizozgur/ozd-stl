@@ -127,9 +127,6 @@ int main()
   auto [texture, textureOk] = DX11_CreateTexture2D(gpu, image.pixels, image.size, textureFormat, true);
   Defer(DX11_ReleaseTexture2D(&texture););
 
-  auto textureSize = DX11_GetTexture2DSize(texture);
-  auto imageAspect = static_cast<f32>(textureSize.width) / textureSize.height;
-
   auto dwrite = Win32_CreateDWrite();
   // String fontPaths[] = {Win32_PathFromExe(&arena, StringLit("../Assets/JetBrainsMono-Regular.ttf"))};
   // auto fontFiles = Win32_DWriteCollectionFromFiles(dwrite, SliceFromArray(fontPaths));
@@ -144,7 +141,7 @@ int main()
   Defer(R_Release(&r););
 
   auto [r3d, r3dOk] = R3D_Init(gpu);
-  auto chairPath = Win32_PathFromExe(&arena, StringLit("../Assets/Chair/chair.gltf"));
+  auto chairPath = Win32_PathFromExe(&arena, StringLit("../Assets/DamagedHelmet/DamagedHelmet.gltf"));
   auto [chair, chairOk] = R3D_LoadMesh(gpu, chairPath);
   auto [depth, depthOk] = DX11_CreateDepthTarget(gpu, DX11_GetSwapchainSize(swapchain));
   Defer(R3D_Release(&r3d);
@@ -167,7 +164,7 @@ int main()
     timeLast = timeNow;
     UpdateTitle(hWnd, frameTime);
 
-    DX11_WaitForBetterLatency(swapchain); // call it before handling input
+    // DX11_WaitForBetterLatency(swapchain); // call it before handling input
     Win32_PollMessages(&g.inputState);
 
     DX11_ResizeSwapchain(gpu, &swapchain, Vector2Cast<u32>(g.windowState.clientSize));
@@ -177,29 +174,32 @@ int main()
     DX11_ResizeDepthTarget(gpu, &depth, backbufferSize);
     DX11_ClearDepthTarget(gpu, depth);
 
-    {
-      CameraUpdate(&camera, &g.inputState, frameTime);
-      f32 aspect = static_cast<f32>(backbufferSize.width) / backbufferSize.height;
-      auto projection = Matrix4x4PerspectiveRH(RadiansFromDegreesF32(60), aspect, 0.1f, 100);
-
-      DX11_SetBackbufferAsRenderTarget(gpu, swapchain, depth);
-      R3D_Bind(&r3d);
-      R3D_DrawMesh(&r3d, chair, projection * Camera3DViewMatrix(&camera), Matrix4x4Identity());
-    }
-
-    DX11_SetBackbufferAsRenderTarget(gpu, swapchain);
-
     Vector2<f32> screenSize = Vector2Cast<f32>(backbufferSize);
     {
+      CameraUpdate(&camera, &g.inputState, frameTime);
+      f32 aspect = screenSize.width / screenSize.height;
+      auto projectionMatrix = Matrix4x4PerspectiveRH(RadiansFromDegreesF32(60), aspect, 0.1f, 100);
+      auto cameraMatrix = Camera3DViewMatrix(&camera);
+      auto viewProjectionMatrix = projectionMatrix * cameraMatrix;
+
+      DX11_SetBackbufferAsRenderTarget(gpu, swapchain, depth);
+      R3D_Bind(&r3d, viewProjectionMatrix);
+
+      R3D_DrawMesh(&r3d, chair, Matrix4x4RotationX(RadiansFromDegreesF32(90)));
+      R3D_DrawMesh(&r3d, chair, Matrix4x4Translate({3, 0, 0}) * Matrix4x4RotationX(RadiansFromDegreesF32(90)));
+    }
+
+    {
+      DX11_SetBackbufferAsRenderTarget(gpu, swapchain);
       R_Bind(&r, screenSize);
       Defer(R_Flush(&r););
 
       if (showImage)
       {
-        f32 imageHeight = screenSize.height * 0.6f;
-        Vector2<f32> imageSize = {imageHeight * imageAspect, imageHeight};
-        Rect<f32> dstRect = {.position = (screenSize - imageSize) / 2.0f, .size = imageSize};
-        Rect<f32> srcRect = {.position = {0, 0}, .size = Vector2Cast<f32>(textureSize)};
+        auto imageSize = Vector2Cast<f32>(DX11_GetTexture2DSize(texture));
+        auto dstSize = imageSize * 2;
+        Rect<f32> srcRect = {.position = {}, .size = imageSize};
+        Rect<f32> dstRect = {.position = (screenSize - dstSize) / 2.0f, .size = dstSize};
         R_PushImage(&r, texture, dstRect, srcRect, {255, 255, 255, 255}, 24);
       }
 

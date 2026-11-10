@@ -1,10 +1,3 @@
-cbuffer Constants : register(b0)
-{
-  float4x4 toClip;
-};
-
-StructuredBuffer<float3> positions : register(t0);
-
 static const uint PALETTE_COUNT = 23;
 static const float3 PALETTE[PALETTE_COUNT] = {
   float3(0x6f, 0x67, 0x76) / 255.0,
@@ -32,12 +25,39 @@ static const float3 PALETTE[PALETTE_COUNT] = {
   float3(0x43, 0x34, 0x55) / 255.0,
 };
 
-float4 VSMain(uint vertexId : SV_VertexID) : SV_Position
+cbuffer FrameConstants : register(b0)
 {
-  return mul(toClip, float4(positions[vertexId], 1));
+  float4x4 viewProjectionMatrix;
+};
+
+cbuffer MeshConstants : register(b1)
+{
+  float4x4 modelMatrix;
+};
+
+StructuredBuffer<float3> positions : register(t0);
+StructuredBuffer<float2> texcoords : register(t1);
+Texture2D albedo : register(t2);
+SamplerState linearSampler : register(s0);
+
+struct Pixel
+{
+  float4 position : SV_Position;
+  float2 texcoord : TEXCOORD;
+};
+
+Pixel VSMain(uint vertexId : SV_VertexID)
+{
+  Pixel pixel;
+  float4 worldPosition = mul(modelMatrix, float4(positions[vertexId], 1));
+  pixel.position = mul(viewProjectionMatrix, worldPosition);
+  pixel.texcoord = texcoords[vertexId];
+  return pixel;
 }
 
-float4 PSMain(uint primitiveId : SV_PrimitiveID) : SV_Target
+float4 PSMain(Pixel pixel) : SV_Target
 {
-  return float4(PALETTE[primitiveId % PALETTE_COUNT], 1);
+  float3 colorLinear = albedo.Sample(linearSampler, pixel.texcoord).rgb;
+  float3 color = pow(abs(colorLinear), 1 / 2.2);
+  return float4(color, 1);
 }

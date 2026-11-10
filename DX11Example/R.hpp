@@ -215,11 +215,9 @@ inline Vector2<f32> R_PushText(R_State *r, Vector2<f32> pen, Win32_DWrite_Font f
 
     if (glyphOk && glyph.size.width != 0)
     {
-      f32 left = (pen.x + shaped.offset.x) + glyph.offset.x;
-      f32 top = (pen.y + shaped.offset.y) + glyph.offset.y;
-
+      auto leftTop = pen + shaped.offset + Vector2Cast<f32>(glyph.offset);
       R_Instance instance = {
-        .dstPosition = {left, top},
+        .dstPosition = leftTop,
         .dstSize = Vector2Cast<f32>(glyph.size),
         .srcPosition = Vector2Cast<f32>(glyph.position),
         .srcSize = Vector2Cast<f32>(glyph.size),
