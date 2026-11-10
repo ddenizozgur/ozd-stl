@@ -20,6 +20,9 @@ struct Example_Globals
 {
   Win32_Window_State windowState;
   Win32_Input_State inputState;
+  R3D_Frame_Constants frameConstants;
+  f32 lightElevationDegrees = 55;
+  f32 lightAzimuthDegrees = 140; // around Y, 0 is -Z
 };
 inline Example_Globals g;
 
@@ -120,13 +123,6 @@ int main()
         DX11_ReleaseSwapchain(&swapchain););
 
   auto arena = ArenaInit();
-  auto imagePath = Win32_PathFromExe(&arena, StringLit("../Assets/Pattern.png"));
-  auto [fileBytes, fileOk] = Win32_ReadEntireFile(&arena, imagePath);
-  auto [image, imageOk] = Win32_WicDecodeImageAs(&arena, fileBytes, Image_Format_RGBA8Premultiplied);
-  auto textureFormat = DX11_TextureFormatFromImage(image.format, false);
-  auto [texture, textureOk] = DX11_CreateTexture2D(gpu, image.pixels, image.size, textureFormat, true);
-  Defer(DX11_ReleaseTexture2D(&texture););
-
   auto dwrite = Win32_CreateDWrite();
   // String fontPaths[] = {Win32_PathFromExe(&arena, StringLit("../Assets/JetBrainsMono-Regular.ttf"))};
   // auto fontFiles = Win32_DWriteCollectionFromFiles(dwrite, SliceFromArray(fontPaths));
@@ -136,11 +132,11 @@ int main()
   Defer(Win32_DWriteReleaseFont(&font);
         Win32_DWriteReleaseCollection(dwrite, &fontFiles);
         Win32_ReleaseDWrite(&dwrite););
-
   auto [r, rOk] = R_Init(&arena, gpu, dwrite);
   Defer(R_Release(&r););
 
   auto [r3d, r3dOk] = R3D_Init(gpu);
+  // auto chairPath = Win32_PathFromExe(&arena, StringLit("../Assets/Chair/Chair.gltf"));
   auto chairPath = Win32_PathFromExe(&arena, StringLit("../Assets/DamagedHelmet/DamagedHelmet.gltf"));
   auto [chair, chairOk] = R3D_LoadMesh(gpu, chairPath);
   auto [depth, depthOk] = DX11_CreateDepthTarget(gpu, DX11_GetSwapchainSize(swapchain));
@@ -149,13 +145,12 @@ int main()
         DX11_ReleaseDepthTarget(&depth););
 
   Camera3D camera = {.position = {0, 1, 3}};
-
-  bool showImage = false;
   Debug_UI debug = {.panelPosition = {16, 16}};
 
   ShowWindow(hWnd, SW_SHOWMAXIMIZED);
   // ShowWindow(hWnd, SW_SHOW);
-  auto timeLast = Win32_NowNanoseconds();
+  auto timeStart = Win32_NowNanoseconds();
+  auto timeLast = timeStart;
 
   for (; !g.windowState.destroyed;)
   {
@@ -164,7 +159,7 @@ int main()
     timeLast = timeNow;
     UpdateTitle(hWnd, frameTime);
 
-    // DX11_WaitForBetterLatency(swapchain); // call it before handling input
+    DX11_WaitForBetterLatency(swapchain); // call it before handling input
     Win32_PollMessages(&g.inputState);
 
     DX11_ResizeSwapchain(gpu, &swapchain, Vector2Cast<u32>(g.windowState.clientSize));
@@ -174,39 +169,47 @@ int main()
     DX11_ResizeDepthTarget(gpu, &depth, backbufferSize);
     DX11_ClearDepthTarget(gpu, depth);
 
-    Vector2<f32> screenSize = Vector2Cast<f32>(backbufferSize);
+    auto backbufferSizeF32 = Vector2Cast<f32>(backbufferSize);
     {
       CameraUpdate(&camera, &g.inputState, frameTime);
-      f32 aspect = screenSize.width / screenSize.height;
+      f32 aspect = backbufferSizeF32.width / backbufferSizeF32.height;
       auto projectionMatrix = Matrix4x4PerspectiveRH(RadiansFromDegreesF32(60), aspect, 0.1f, 100);
       auto cameraMatrix = Camera3DViewMatrix(&camera);
-      auto viewProjectionMatrix = projectionMatrix * cameraMatrix;
+      g.frameConstants.viewProjectionMatrix = projectionMatrix * cameraMatrix;
+
+      f32 elevation = RadiansFromDegreesF32(g.lightElevationDegrees);
+      f32 azimuth = RadiansFromDegreesF32(g.lightAzimuthDegrees);
+      g.frameConstants.directionToLight = DirectionFromYawPitch(azimuth, elevation);
 
       DX11_SetBackbufferAsRenderTarget(gpu, swapchain, depth);
-      R3D_Bind(&r3d, viewProjectionMatrix);
+      R3D_Bind(&r3d, g.frameConstants);
 
-      R3D_DrawMesh(&r3d, chair, Matrix4x4RotationX(RadiansFromDegreesF32(90)));
-      R3D_DrawMesh(&r3d, chair, Matrix4x4Translate({3, 0, 0}) * Matrix4x4RotationX(RadiansFromDegreesF32(90)));
+      R3D_DrawMesh(&r3d, chair, {.modelMatrix = Matrix4x4RotationX(RadiansFromDegreesF32(90))});
+      R3D_DrawMesh(&r3d, chair, {.modelMatrix = Matrix4x4Translate({2, 0, 0}) * Matrix4x4RotationX(RadiansFromDegreesF32(90))});
     }
 
     {
       DX11_SetBackbufferAsRenderTarget(gpu, swapchain);
-      R_Bind(&r, screenSize);
+      R_Bind(&r, backbufferSizeF32);
       Defer(R_Flush(&r););
 
-      if (showImage)
       {
-        auto imageSize = Vector2Cast<f32>(DX11_GetTexture2DSize(texture));
-        auto dstSize = imageSize * 2;
-        Rect<f32> srcRect = {.position = {}, .size = imageSize};
-        Rect<f32> dstRect = {.position = (screenSize - dstSize) / 2.0f, .size = dstSize};
-        R_PushImage(&r, texture, dstRect, srcRect, {255, 255, 255, 255}, 24);
-      }
+        auto scratch = ScratchBegin();
+        Defer(ScratchEnd(scratch););
 
-      {
         Debug_Begin(&debug, &g.inputState, &r, font, StringLit("Debug"));
 
-        Debug_Checkbox(&debug, &showImage, StringLit("Show image"));
+        Debug_Checkbox(&debug, &g.frameConstants.showAlbedo, StringLit("Show albedo"));
+
+        Debug_SliderF32(&debug, &g.lightElevationDegrees, 0, 90, StringLit("Light elevation"));
+        Debug_Label(&debug, StringFmt(scratch.arena, "%.2f", g.lightElevationDegrees));
+        Debug_SliderF32(&debug, &g.lightAzimuthDegrees, 0, 360, StringLit("Light azimuth"));
+        Debug_Label(&debug, StringFmt(scratch.arena, "%.2f", g.lightAzimuthDegrees));
+        Debug_SliderF32(&debug, &g.frameConstants.lightIntensity, 0, 10, StringLit("Light intensity"));
+        Debug_Label(&debug, StringFmt(scratch.arena, "%.2f", g.frameConstants.lightIntensity));
+        Debug_SliderF32(&debug, &g.frameConstants.ambient, 0, 1, StringLit("Ambient"));
+        Debug_Label(&debug, StringFmt(scratch.arena, "%.2f", g.frameConstants.ambient));
+
         auto debugHasMouse = Debug_End(&debug);
         (void)debugHasMouse;
       }

@@ -349,6 +349,15 @@ template <typename T>
 // a zero vector gives NaN
 [[nodiscard]] inline Vector3<f32> NormalizeF32(Vector3<f32> vector) { return vector / LengthF32(vector); }
 
+// returns unit length
+[[nodiscard]]
+inline Vector3<f32> DirectionFromYawPitch(f32 yawRadians, f32 pitchRadians)
+{
+  return {cosf(pitchRadians) * sinf(yawRadians),
+          sinf(pitchRadians),
+          -cosf(pitchRadians) * cosf(yawRadians)};
+}
+
 [[nodiscard]] constexpr Vector3<f32>
 LerpF32(Vector3<f32> start, Vector3<f32> end, f32 t)
 {

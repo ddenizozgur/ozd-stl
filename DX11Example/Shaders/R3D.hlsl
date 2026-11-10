@@ -1,3 +1,5 @@
+static const float PI_F32 = 3.14159265;
+
 static const uint PALETTE_COUNT = 23;
 static const float3 PALETTE[PALETTE_COUNT] = {
   float3(0x6f, 0x67, 0x76) / 255.0,
@@ -28,6 +30,11 @@ static const float3 PALETTE[PALETTE_COUNT] = {
 cbuffer FrameConstants : register(b0)
 {
   float4x4 viewProjectionMatrix;
+  bool showAlbedo;
+  float3 directionToLight;
+  float lightIntensity;
+  float3 lightColor;
+  float ambient;
 };
 
 cbuffer MeshConstants : register(b1)
@@ -37,13 +44,15 @@ cbuffer MeshConstants : register(b1)
 
 StructuredBuffer<float3> positions : register(t0);
 StructuredBuffer<float2> texcoords : register(t1);
-Texture2D albedo : register(t2);
+StructuredBuffer<float3> normals : register(t2);
+Texture2D albedo : register(t3);
 SamplerState linearSampler : register(s0);
 
 struct Pixel
 {
   float4 position : SV_Position;
   float2 texcoord : TEXCOORD;
+  float3 normal : NORMAL;
 };
 
 Pixel VSMain(uint vertexId : SV_VertexID)
@@ -52,12 +61,32 @@ Pixel VSMain(uint vertexId : SV_VertexID)
   float4 worldPosition = mul(modelMatrix, float4(positions[vertexId], 1));
   pixel.position = mul(viewProjectionMatrix, worldPosition);
   pixel.texcoord = texcoords[vertexId];
+  pixel.normal = mul(modelMatrix, float4(normals[vertexId], 0)).xyz;
   return pixel;
 }
 
-float4 PSMain(Pixel pixel) : SV_Target
+float4 PSMain(Pixel pixel, uint primitiveId : SV_PrimitiveID) : SV_Target
 {
-  float3 colorLinear = albedo.Sample(linearSampler, pixel.texcoord).rgb;
-  float3 color = pow(abs(colorLinear), 1 / 2.2);
+  float3 normal = normalize(pixel.normal);
+  float3 albedoColor = albedo.Sample(linearSampler, pixel.texcoord).rgb;
+
+  // Lambert
+  float3 diffuseBrdf = albedoColor / PI_F32;
+
+  float cosTheta = saturate(dot(normal, directionToLight));
+  float3 sunIrradiance = lightColor * lightIntensity * cosTheta;
+  float3 sunReflected = diffuseBrdf * sunIrradiance;
+
+  // the same radiance arriving from the whole hemisphere adds up to PI times it
+  float3 ambientIrradiance = ambient * PI_F32;
+  float3 ambientReflected = diffuseBrdf * ambientIrradiance;
+
+  float3 radianceToCamera = sunReflected + ambientReflected;
+
+  float3 color = PALETTE[primitiveId % PALETTE_COUNT];
+  if (showAlbedo)
+  {
+    color = pow(abs(radianceToCamera), 1 / 2.2);
+  }
   return float4(color, 1);
 }

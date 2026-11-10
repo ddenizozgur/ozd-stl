@@ -12,9 +12,7 @@ struct Camera3D
 [[nodiscard]]
 inline Vector3<f32> Camera3DForward(const Camera3D *camera)
 {
-  return {cosf(camera->pitch) * sinf(camera->yaw),
-          sinf(camera->pitch),
-          -cosf(camera->pitch) * cosf(camera->yaw)};
+  return DirectionFromYawPitch(camera->yaw, camera->pitch);
 }
 
 [[nodiscard]]
