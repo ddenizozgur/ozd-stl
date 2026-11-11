@@ -8,6 +8,29 @@
 #include "../DX11Stuff/Shader.hpp"
 #include "../Misc/GLTF.hpp"
 
+using Diffuse_Kind = u32;
+enum : Diffuse_Kind
+{
+  Diffuse_Kind_Lambert,
+  Diffuse_Kind_Half_Lambert,
+  Diffuse_Kind_COUNT,
+};
+
+[[nodiscard]]
+inline String StringFromDiffuseKind(Diffuse_Kind kind)
+{
+  switch (kind)
+  {
+  case Diffuse_Kind_Lambert:
+    return StringLit("Lambert");
+  case Diffuse_Kind_Half_Lambert:
+    return StringLit("Half Lambert");
+  default:
+    assert(false && "unknown diffuse kind");
+    return StringLit("Lambert");
+  }
+}
+
 struct alignas(16) R3D_Frame_Constants
 {
   Matrix4x4 viewProjectionMatrix;
@@ -16,6 +39,7 @@ struct alignas(16) R3D_Frame_Constants
   f32 lightIntensity = 4;
   Vector3<f32> lightColor = {1, 0.96f, 0.9f};
   f32 ambient = 0.15f;
+  Diffuse_Kind diffuseKind;
 };
 
 struct alignas(16) R3D_Mesh_Constants

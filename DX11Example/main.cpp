@@ -185,7 +185,7 @@ int main()
       R3D_Bind(&r3d, g.frameConstants);
 
       R3D_DrawMesh(&r3d, chair, {.modelMatrix = Matrix4x4RotationX(RadiansFromDegreesF32(90))});
-      R3D_DrawMesh(&r3d, chair, {.modelMatrix = Matrix4x4Translate({2, 0, 0}) * Matrix4x4RotationX(RadiansFromDegreesF32(90))});
+      R3D_DrawMesh(&r3d, chair, {.modelMatrix = Matrix4x4Translate({3, 0, 0}) * Matrix4x4RotationX(RadiansFromDegreesF32(90))});
     }
 
     {
@@ -200,6 +200,11 @@ int main()
         Debug_Begin(&debug, &g.inputState, &r, font, StringLit("Debug"));
 
         Debug_Checkbox(&debug, &g.frameConstants.showAlbedo, StringLit("Show albedo"));
+
+        if (Debug_Button(&debug, StringFromDiffuseKind(g.frameConstants.diffuseKind)))
+        {
+          g.frameConstants.diffuseKind = (g.frameConstants.diffuseKind + 1) % Diffuse_Kind_COUNT;
+        }
 
         Debug_SliderF32(&debug, &g.lightElevationDegrees, 0, 90, StringLit("Light elevation"));
         Debug_Label(&debug, StringFmt(scratch.arena, "%.2f", g.lightElevationDegrees));

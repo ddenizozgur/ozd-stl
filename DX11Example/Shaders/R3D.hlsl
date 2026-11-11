@@ -27,7 +27,48 @@ static const float3 PALETTE[PALETTE_COUNT] = {
   float3(0x43, 0x34, 0x55) / 255.0,
 };
 
-cbuffer FrameConstants : register(b0)
+// https://en.wikipedia.org/wiki/SRGB#Specification_of_the_transformation
+float3 LinearToSrgb(float3 c) {
+	c = saturate(c);
+	return (c <= 0.0031308)
+		? c * 12.92
+		: 1.055 * pow(c, 1 / 2.4) - 0.055;
+}
+
+float3 DiffuseLambert(float3 albedoColor, float3 normal, float3 directionToLight)
+{
+  float3 brdf = albedoColor / PI_F32;
+  float cosTheta = saturate(dot(normal, directionToLight));
+  return brdf * cosTheta;
+}
+
+float3 DiffuseHalfLambert(float3 albedoColor, float3 normal, float3 directionToLight)
+{
+  float3 brdf = albedoColor / PI_F32;
+  float cosTheta = dot(normal, directionToLight);
+  float remapped = (cosTheta + 1) * 0.5;
+  return brdf * remapped * remapped;
+}
+
+#define DIFFUSE_LAMBERT       0
+#define DIFFUSE_HALF_LAMBERT  1
+
+float3 DiffuseTerm(uint diffuseKind, float3 albedoColor, float3 normal, float3 directionToLight)
+{
+  float3 res = 0;
+  switch (diffuseKind)
+  {
+  case DIFFUSE_LAMBERT:
+    res = DiffuseLambert(albedoColor, normal, directionToLight);
+    break;
+  case DIFFUSE_HALF_LAMBERT:
+    res = DiffuseHalfLambert(albedoColor, normal, directionToLight);
+    break;
+  }
+  return res;
+}
+
+cbuffer Frame_Constants : register(b0)
 {
   float4x4 viewProjectionMatrix;
   bool showAlbedo;
@@ -35,9 +76,10 @@ cbuffer FrameConstants : register(b0)
   float lightIntensity;
   float3 lightColor;
   float ambient;
+  uint diffuseKind;
 };
 
-cbuffer MeshConstants : register(b1)
+cbuffer Mesh_Constants : register(b1)
 {
   float4x4 modelMatrix;
 };
@@ -70,23 +112,19 @@ float4 PSMain(Pixel pixel, uint primitiveId : SV_PrimitiveID) : SV_Target
   float3 normal = normalize(pixel.normal);
   float3 albedoColor = albedo.Sample(linearSampler, pixel.texcoord).rgb;
 
-  // Lambert
-  float3 diffuseBrdf = albedoColor / PI_F32;
+  float3 sunIrradiancePerpendicular = lightColor * lightIntensity;
+  float3 sunReflected = sunIrradiancePerpendicular * DiffuseTerm(diffuseKind, albedoColor, normal, directionToLight);
 
-  float cosTheta = saturate(dot(normal, directionToLight));
-  float3 sunIrradiance = lightColor * lightIntensity * cosTheta;
-  float3 sunReflected = diffuseBrdf * sunIrradiance;
-
-  // the same radiance arriving from the whole hemisphere adds up to PI times it
+  float3 ambientBrdf = albedoColor / PI_F32;
   float3 ambientIrradiance = ambient * PI_F32;
-  float3 ambientReflected = diffuseBrdf * ambientIrradiance;
+  float3 ambientReflected = ambientBrdf * ambientIrradiance;
 
   float3 radianceToCamera = sunReflected + ambientReflected;
 
   float3 color = PALETTE[primitiveId % PALETTE_COUNT];
   if (showAlbedo)
   {
-    color = pow(abs(radianceToCamera), 1 / 2.2);
+    color = LinearToSrgb(radianceToCamera);
   }
   return float4(color, 1);
 }
